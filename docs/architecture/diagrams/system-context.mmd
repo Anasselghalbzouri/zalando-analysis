@@ -1,0 +1,20 @@
+%% System context: independent flash-sale application (Phase 05, PROPOSED)
+flowchart TB
+  member["Member (registered shopper)<br/>CONFIRMED role"]
+  guest["Guest<br/>UNKNOWN role (Q-03, Q-28)"]
+  merch["Merchandiser / back-office user<br/>HYPOTHESIS role (Q-50)"]
+  system["Flash-sale web application<br/>(React SPA + Laravel REST API)"]
+  checkout["Checkout & payment<br/>OUT OF SCOPE (M21, Q-04)"]
+  mail["Transactional e-mail provider<br/>PROPOSED (verification, password reset)"]
+  esp["Newsletter / e-mail marketing tool<br/>UNKNOWN (sending not observed)"]
+  cmp["Consent management (CMP)<br/>CONFIRMED need (FR-CNT-04), tool UNKNOWN"]
+  analytics["Analytics<br/>PROPOSED, consent-gated (NFR-PRV-01)"]
+
+  member -->|browses, reserves, manages account| system
+  guest -.->|access mode UNKNOWN| system
+  merch -.->|manages campaigns, catalogue, stock<br/>(interface not specified)| system
+  system -->|hand-off from cart (boundary only)| checkout
+  system -->|sends account e-mails| mail
+  system -.->|exports newsletter preferences| esp
+  member -->|sets consent| cmp
+  system -.->|events only after consent| analytics

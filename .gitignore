@@ -1,0 +1,27 @@
+# ---- Environment files: never commit (secrets, local credentials) ----
+.env
+.env.*
+!.env.example
+
+# ---- Dependencies and build output ----
+node_modules/
+vendor/
+frontend/dist/
+
+# ---- Raw analysis evidence ----
+# The reference-platform captures (raw HAR, screenshots, accessibility snapshots) may contain
+# cookies, session data or personal data. Keep them out of source control unless the owner
+# reviews and approves specific files (docs/phase-07/06-phase-07-summary.md, open decision).
+evidence/
+
+# ---- Local tooling ----
+# Claude Code: local settings stay private; the Spec Kit skills are shared with the team.
+.claude/*
+!.claude/skills/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
+*.stackdump
+.DS_Store
+Thumbs.db

@@ -1,0 +1,1540 @@
+// Phase 06 backlog source. Parsed by gen.py, which writes docs/phase-06/ and runs the validation checks.
+// Markers: #E epic | !S sprint | ^R risk | ?Q open question | @US story (followed by key: value lines).
+// Separator inside markers and ac lines: " | ". Keep "|" out of free text.
+
+#E01 | Authentication & Identity | Members register, log in and out and recover access through a same-origin Sanctum SPA session with CSRF protection, and catalogue routes follow one access setting. | Identity, Storefront (catalog.access)
+#E02 | User Account | The account area: navigation, overview, personal details, newsletter, saved sizes, and the orders and returns entry pages (empty states only). | Account
+#E03 | Catalog Management | The catalogue data model: brands, category tree, size systems and values, products, images, variants and attributes. | Catalog
+#E04 | Categories & Brands | Category and brand listing contexts with their headers and breadcrumbs. | Catalog, Listing
+#E05 | Campaign Management | Landings, campaigns and campaign articles, the derived lifecycle, headlines, countdowns and upcoming sales. | Sales
+#E06 | Product Listing | The one shared listing: tiles, sort, filters and facets, pagination and tile states. | Listing
+#E07 | Product Details | The product detail page: content, prices, sizes, stock hint and size validation. | Sales, Inventory
+#E08 | Search | Brand suggestions while typing, and search results across campaigns. | Listing, Catalog
+#E09 | Inventory Management | Stock per campaign article and size, with atomic reserve and release. | Inventory
+#E10 | Cart & Reservations | Reserve, view and remove items, reservation expiry, and the hand-off button at the checkout boundary. | Cart
+#E11 | Storefront UI | App shell, header, navigation, time and money formatting, timezone and responsive structure. | SPA (app, shared, features)
+#E12 | Content & Help Pages | Help centre, terms and legal pages, footer and footnotes, cookie consent. | Content
+#E13 | Quality Assurance | Cross-cutting verification: concurrency and time-travel tests, accessibility, French copy, performance. | All modules
+#E14 | Infrastructure & Deployment | Docker environment, CI, API foundation, transport security and the MySQL behaviour spike. Scheduled first. | Platform, Storefront (settings)
+#E15 | Recommendations | Added epic. Recommendation rails are CONFIRMED UI with UNKNOWN logic and have their own module (Recommendations) and open questions. | Recommendations
+#E16 | Data Administration | Added epic. No back-office is designed (C-16), yet data must exist: synthetic seed data now, production data entry once Q-50 is answered. | All modules (seeders)
+
+!S0 | Foundations and decisions | A running local stack, CI on MySQL 8, the API foundation and security headers; the MySQL spike done; the Sprint 0 decision workshop held. | Docker stack on localhost:8080; CI pipeline; problem+json renderer, request IDs, server time, settings with fail-closed check; Nginx headers; spike report with any schema errata; shared formatting utilities | R-04, R-10, R-15, R-24 | Before Sprint 1 planning: Q-70 (product granularity), Q-71 (catalogue access), Q-40 (login methods), Q-80 (MVP release purpose), Q-81 (capacity), Q-82 (CI platform), Q-84 (root slug fix)
+!S1 | Identity and catalogue core | Members can register, log in, log out and reset a password; the app shell exists; the catalogue tables are migrated. | Auth pages and endpoints; catalogue access mode; app shell and header; Catalog migrations, models, factories with the root-slug fix | R-07, R-08, R-19, R-20 | US-012 can't start until Q-70 and Q-84 are answered
+!S2 | Sales, landings and seed data | Landing pages show live campaigns with headlines and countdowns, driven by a derived lifecycle and synthetic seed data. | Sales migrations and live predicate; boundary events; seeders for every campaign state; landing pages; campaign tiles; main navigation; footer and footnotes | R-08, R-09, R-12, R-17 | US-015 needs Q-70; Q-23, Q-24 and Q-77 before US-017 acceptance
+!S3 | Listing and inventory core | Members can browse campaign and category listings with sort and filters; stock is reserved and released atomically. | Shared listing and facets; category listing; mega-menu; inventory module with ReserveUnit and ReleaseUnit; tile availability states | R-03, R-09, R-23 | Q-11, Q-14, Q-43 and Q-45 before acceptance of US-023, US-025, US-024 and US-027
+!S4 | Product page and cart | The core journey J1 works end to end: product page, size choice, reserve, cart drawer, remove, with concurrency tests passing. | PDP; low-stock label; size validation; add, view and remove cart items; expiry sweep behind its switch; brand page; concurrency and time-travel suite | R-01, R-02, R-03, R-05, R-06 | Q-25, Q-32, Q-46, Q-51 before US-037 acceptance; Q-37 (expiry) before the MVP release decision
+!S5 | Search, legal and hardening: MVP release candidate | Search works, legal and consent are in place, and the J1 journey is verified for accessibility and French copy. | Search suggestions and results; checkout hand-off button per Q-80; help, terms and legal pages; consent; a11y and copy verification; timezone, responsive and performance stories if their decisions arrived | R-11, R-13, R-14, R-16, R-22, R-25, R-26 | MVP release needs every release gate in 10-phase-06-summary.md §4
+!S6 | Post-MVP: account and discovery | The account area, upcoming sales and filter refinements are added. | Account overview, profile, newsletter, unsubscribe, saved sizes, orders and returns entry pages; e-mail verification; upcoming section; filter dialog refinements | R-21, R-24 | Q-41, Q-83, Q-35, Q-74 before acceptance
+!S7 | Post-MVP: recommendations and validated hypotheses | Recommendation rails, attribution, and whichever HYPOTHESIS behaviours the PO has validated. | Rails and popular strategy; link attribution; grid order, curated template, live-window guard, last-hours badge, after-add button, bulk-add throttle (each only if validated) | R-21, R-27, R-29 | Each HYPOTHESIS story enters the sprint only after its PO validation
+
+^R-01 | Reservation expiry lifecycle undecided. FR-CRT-08 is a HYPOTHESIS; if the PO turns `release_expired_reservations` off, a reserved unit is never returned to other members (C-08). | High | High | Decide Q-37 before the MVP release; build the sweep behind its switch (US-040); expired rows are never shown in the cart and never counted against the limit, even before the sweep. | E10, E09 | Product Owner | US-040, US-037
+^R-02 | Stock leak when a member re-adds the same size after expiry but before the sweep. | Medium | High | AddToCart releases the stale row in the same transaction (ADR-010); dedicated time-travel test in US-053. | E10 | Backend Lead | US-037, US-053
+^R-03 | Overselling under concurrent reservations if the reserve isn't a single conditional atomic update, or if a read-then-write slips in. | Medium | High | Only ReserveUnit changes `quantity_reserved` (ADR-005); CHECK invariant; parallel-connection test on MySQL; code review checklist item. | E09 | Backend Lead | US-036, US-053
+^R-04 | Concurrency tests give false confidence if run on SQLite or a single connection. | High | High | CI uses a MySQL 8 service; the harness opens parallel connections (US-058, US-053). | E13, E14 | QA Lead | US-053, US-058
+^R-05 | The expiry sweep races with remove, re-add or a future checkout on the same row, releasing a unit twice. | Medium | High | ReleaseUnit decrements only when it deletes the reservation row in the same transaction; batches lock rows; race tests in US-040. | E10 | Backend Lead | US-040
+^R-06 | The scheduler isn't running, so expired reservations are never released and boundary events are missed. | Medium | High | Scheduler as its own service with a health check; boundary events use a watermark so missed minutes catch up; alert on a stale watermark. | E14, E10 | DevOps | US-057, US-015, US-040
+^R-07 | Phase 05 erratum: `categories` has UQ (parent_id, slug) with a nullable `parent_id`. MySQL unique indexes treat NULLs as distinct, so two root categories can share a slug. Seeders or imports keyed by slug would then break. | High | Medium | Fix in US-012 with a method chosen under Q-84 (e.g. a generated non-null parent key in the unique index, or a service-level check). schema.md is left unchanged until the architect approves the erratum. | E03 | Architect | US-012
+^R-08 | Product granularity (Q-70) unresolved: model vs model + colour changes `products`, `campaign_articles` and `inventory_items`; late answers mean migration rework across three modules. | High | High | Q-70 is a Sprint 0 gate; US-012, US-015 and US-036 don't freeze migrations before it. | E03, E05, E09 | Product Owner | US-012, US-015, US-036
+^R-09 | Campaign/product/variant inconsistency: an inventory item whose variant and campaign article belong to different products, or a variant from another product in an add request. | Medium | High | Composite FKs through `product_id` (verified in the US-061 spike); `AddCartItemRequest` checks the variant belongs to the SKU's product; factories build consistent graphs. | E05, E09, E03 | Backend Lead | US-061, US-015, US-036, US-032
+^R-10 | Unverified MySQL behaviours: CHECK constraints combined with FK referential actions, unsigned subtraction in generated columns (`quantity_available`, `discount_percent`), and composite FKs. Any of them may fail at migration time or raise a different error than designed. | Medium | Medium | US-061 spike in Sprint 0; errata approved before US-012 and US-015 freeze migrations. | E14, E03 | Tech Lead | US-061
+^R-11 | Data administration gap: no back-office, import format or admin UI is designed (C-16, Q-50), so real catalogue and campaign data can't be loaded. | High | High | Synthetic seeders for build and demo (US-064); production data entry is a release gate (US-065) that needs Q-50. | E16 | Product Owner | US-064, US-065
+^R-12 | Seed data or fixtures copy reference-platform content (brand names, images, texts, IDs), breaking the independence constraint. | Low | High | Seed review in the DoD; generated names and placeholder images only. | E16 | Tech Lead | US-064
+^R-13 | Checkout boundary: the MVP can reserve but can't sell. Stakeholders may expect orders, and reserved stock is never converted to sold. | High | High | Q-80 decides the MVP purpose and the "Commander" target; M21 needs its own specification (Q-04) before any public launch that takes orders. | E10 | Product Owner | US-041
+^R-14 | Scope creep into checkout: order tables, payment endpoints or fee charging added "temporarily". | Medium | Medium | DoD item and review check: no checkout, payment or order code; boundary contracts stay outlines (api-contracts §10). | E10 | Scrum Master | US-041, US-038
+^R-15 | Policy settings unset: production fails closed (503 `settings_incomplete`) while any of the 11 PO-decided values is missing (`listing_page_size` is CONFIRMED). | High | Medium | Settings checklist with Q-IDs is a release gate; development placeholders are labelled and never reach production. | E14 | Product Owner | US-059
+^R-16 | Display timezone undecided (NFR-TIME-01): start and end times shown an hour off for some members. | Medium | Medium | Store UTC; one formatter takes `display_timezone`; Q-10 before release (US-047). | E11 | Product Owner | US-047, US-046
+^R-17 | Stale landing caches keep showing ended campaigns or miss started ones. | Medium | Medium | State is derived per request; caches are invalidated by boundary events with a watermark; time-travel tests. | E05 | Backend Lead | US-015, US-016
+^R-18 | Client clocks are wrong, so countdowns mislead. | Low | Low | `useServerNow` from `meta.server_time` (ADR-009). | E11 | Frontend Lead | US-046
+^R-19 | Login methods undecided (Q-40): adding social login later changes registration, password reset and account linking. | Medium | Medium | Build e-mail/password only after the PO confirms it; keep the Identity actions separate per method. | E01 | Product Owner | US-001, US-002, US-003
+^R-20 | Catalogue access mode undecided (Q-71): route guards, caching rules and SEO differ between `members` and `public`. | Medium | Medium | Both modes built behind one setting (US-005); caching allowed only in `public` mode. | E01 | Product Owner | US-005
+^R-21 | Recommendation logic UNKNOWN (Q-29): personal rails stay empty and hidden, so AC-FR-REC-01-1 can't pass. | High | Low | Provider interface with empty v1 bindings; rails hidden when empty; accept against the PROPOSED popular strategy only. | E15 | Product Owner | US-062, US-063
+^R-22 | Legal content missing (Q-48, Q-31): terms, entity, mediator and one return period are needed before any public release. | High | High | Legal review as a release gate; reference texts never copied; the period comes from one setting. | E12 | Legal / DPO | US-050
+^R-23 | Performance targets unknown (Q-42): FULLTEXT search and facet counts are untested at real volume. | Medium | Medium | Indexing verification plan with EXPLAIN on seed data at volume; load test once targets exist (US-056). | E13, E08, E06 | Tech Lead | US-056, US-025, US-035
+^R-24 | Team capacity and sprint length unknown (Q-81): the sprint plan is a sequence, not a commitment. | High | Medium | Re-plan after Sprint 0 with measured throughput; keep the dependency order. | All | Scrum Master | —
+^R-25 | Accessibility regressions in custom dialogs (filters, cart drawer, remove confirmation, mega-menu). | Medium | Medium | Shared dialog primitives; keyboard E2E of J1 and automated scans in CI (US-054). | E13, E11 | Frontend Lead | US-054
+^R-26 | Consent solution undecided (Q-86): third-party scripts loaded before consent would breach NFR-PRV-01. | Medium | High | No third-party script until the consent gate exists; CSP restricts origins. | E12 | Legal / DPO | US-052
+^R-27 | Bulk reservation abuse at launch hoards limited stock (NFR-SEC-05 is a HYPOTHESIS). | Medium | Medium | Placeholder rate limit on add-to-cart; bot defence decided under Q-42. | E10 | Tech Lead | US-042
+^R-28 | `products.search_text` drifts from brand or product data if the rebuild listener fails. | Low | Medium | Queued, retryable listener; failed-jobs monitoring; a rebuild command. | E08 | Backend Lead | US-035
+^R-29 | HYPOTHESIS behaviours shipped as if confirmed. | Medium | Medium | Each sits behind one switch or its own story with Status Needs Clarification; DoD forbids enabling one without a recorded PO decision. | All | Product Owner | US-019, US-020, US-021, US-028, US-033, US-040, US-042
+
+?Q-01 | May the analysis click "Informez moi", change newsletter settings or "Activez Plus" on the reference? | The notify-me behaviour can't be observed otherwise. | FR-UPC-04 stays undesigned. | User (authorization) | Partly granted; these actions still not authorized
+?Q-03 | May a logged-out (guest) session be observed? | The guest experience is UNKNOWN. | Catalogue access mode can't be grounded in evidence. | User (authorization) | Open
+?Q-04 | Confirm checkout will be specified from scratch as a separate specification. | Without it, "Commander" has no target and nothing can be sold. | US-041 blocked; no orders, returns or fee charging. | Product Owner | Open
+?Q-10 | Is the reference's next-day start time shown in Paris time or the browser's timezone, and which timezone will the new app display? | Every start and end time on screen depends on it. | `display_timezone` unset: production fails closed. | Product Owner (Analysis can narrow it) | Open
+?Q-11 | How does a listing go beyond the first 60 products: a control or infinite scroll? | Defines the listing UI pattern. | API is page-based; UI pagination pattern can't be accepted. | Product Owner / Analysis | Open
+?Q-12 | Does the campaign page show its countdown anywhere? | Decides the campaign listing header. | Placement of the countdown on `/campaigns/{id}`. | Analysis | Open
+?Q-13 | Where does the landing hero link to? | The hero target is a HYPOTHESIS. | Hero rendered without a decided link target. | Analysis / Product Owner | Open
+?Q-14 | What do the Marque, Couleur, Composition and catégories filter dialogs contain, and is filter state in the URL on the reference? | Filter dialog content. | Facets return what the data holds; dialog details unaccepted. | Analysis / Product Owner | Open
+?Q-15 | What are the responsive breakpoints and mobile behaviour? | NFR-RESP-01 is UNKNOWN. | Mobile layouts can't be built or accepted. | Product Owner / Analysis | Open
+?Q-16 | Does the curated (Premium-type) landing really hide the upcoming section and footer? | FR-EVT-05 is a HYPOTHESIS. | Curated template unvalidated. | Analysis | Open
+?Q-17 | What does an ended campaign URL return? | The ended-campaign behaviour is PROPOSED (410). | Live-window guard and ended reads unvalidated. | Analysis / Product Owner | Open
+?Q-20 | Campaign duration and start/end slots: fixed daily slots or free datetimes? | Scheduling rules. | Any datetime accepted until slots are configured. | Product Owner | Open
+?Q-21 | Can a product belong to several concurrent campaigns at different prices? | Shapes campaign-article rules. | Allowed by the schema; validation of the guard. | Product Owner | Open
+?Q-23 | How is the "jusqu'à N%" headline computed: maximum over articles or entered manually? | Headline correctness. | `headline_mode` has no default; tile acceptance waits. | Product Owner | Open
+?Q-24 | When is "Special" used instead of a percentage? | Headline rule. | Merchandiser input only; acceptance waits. | Product Owner | Open
+?Q-25 | How long does a reservation last in the new app? | The timer is the core cart rule. | `reservation_minutes` unset: production fails closed. | Product Owner | Reference answered (20 min); PO value open
+?Q-26 | What is the low-stock threshold for "Plus que N disponibles"? | When the hint shows. | `low_stock_threshold` unset. | Product Owner | Partly answered (N is live); threshold open
+?Q-27 | Should the upcoming list be global or per landing? | Upcoming section content. | Built global (reference behaviour); PO to confirm. | Product Owner | Open
+?Q-28 | What should the guest experience be? | Access model. | With Q-71, decides `catalog_access`. | Product Owner | Open
+?Q-29 | Which recommendation rails and logic are required? | Rails can't be filled otherwise. | Personal rails empty and hidden in v1. | Product Owner | Open
+?Q-30 | What packaging and handling fee does the new app charge? | Display text only in scope; charging is checkout. | `packaging_fee_cents` unset. | Product Owner | Reference answered (3,90 €); PO value open
+?Q-31 | Which single return period applies (30, 31 or 14 days on the reference)? | The PDP, help and terms must agree. | `return_period_days` unset; legal pages blocked. | Product Owner / Legal | Open
+?Q-32 | Is the reservation timer per item or shared, and does it extend when items are added? | Cart timer semantics. | `reservation_timer_mode` unset. | Product Owner | Open
+?Q-33 | Should the new app use fixed launch slots? | Scheduling. | With Q-20. | Product Owner | Open
+?Q-35 | When does an upcoming tile switch from "Démarre dans …" to "Démarre le …"? | Copy rule. | `upcoming_relative_threshold_minutes` unset. | Product Owner | Open
+?Q-36 | What triggers "Dernières heures", and at what threshold? | FR-STK-03 is a HYPOTHESIS. | Badge stays off. | Product Owner | Open
+?Q-37 | What happens visibly when a reservation expires? | FR-CRT-08 is a HYPOTHESIS but expiry is MVP-critical (C-08). | Sweep switch decision; no expiry notification built. | Product Owner | Open
+?Q-38 | What are the return and withdrawal flow steps? | Owned by checkout data. | Only entry pages built. | Product Owner | Open
+?Q-39 | Do saved sizes pre-filter listings? | Possible listing behaviour. | Not built. | Product Owner | Open
+?Q-40 | Which login methods does the new app offer? | Registration and recovery depend on it. | E-mail/password stories wait for confirmation; social login not built. | Product Owner | Open
+?Q-41 | What do registration and personal-details forms contain? | Form fields and data stored. | Only first name, e-mail and password built. | Product Owner / DPO | Open
+?Q-42 | What are the performance and launch-load targets, and is bot protection needed? | NFR-PERF-01 is UNKNOWN; NFR-SEC-05 is a HYPOTHESIS. | No load test acceptance; placeholder rate limits only. | Product Owner | Open
+?Q-43 | What does the default sort "Préférés" rank by? | Default listing order. | Placeholder: merchandising position, then newest. | Product Owner | Open
+?Q-44 | Search: Enter behaviour, other suggestion types, no-results state, minimum length? | Search UX. | Brand suggestions only; acceptance of the rest waits. | Product Owner / Analysis | Open
+?Q-45 | When does a tile show "Réservé"? | Tile state rule. | PROPOSED rule: nothing available but something reserved. | Product Owner | Open
+?Q-46 | Maximum quantity per article per member, and what replaces "Ajouter au panier" after adding? | Cart limit and PDP button. | `max_quantity_per_article` has no default. | Product Owner | Open
+?Q-47 | "Informez moi": channel, stored data, confirmation, unsubscribe? | FR-UPC-04 not designed. | US-022 has no tasks. | User (authorization) / Product Owner | Open
+?Q-48 | Legal entity, contract language and consumer mediator of the new app? | Terms page content. | Legal pages can't be accepted. | Product Owner / Legal | Open
+?Q-49 | How is the delivery window computed? | PDP delivery window and help content. | Window null when no lead time; computation seam only. | Product Owner | Open
+?Q-50 | Back-office: who creates landings, campaigns, assortments, headlines and stock allocations, and how? | No real data can be loaded without it. | Production data entry blocked (US-065). | Product Owner | Open
+?Q-51 | What success copy is shown after adding to the cart? | Copy. | Placeholder copy until decided. | Product Owner | Open
+?Q-63 | What is the session lifetime? | Session settings. | Lifetime from config; value unset. | Product Owner | Open
+?Q-70 | Is a catalogue product a model or a model + colour, and can the same sellable item run in two campaigns at once with separate stock? | Shapes three modules' tables. | US-012, US-015 and US-036 can't freeze migrations. | Product Owner | Open
+?Q-71 | Catalogue access for visitors who aren't logged in: members only or public browsing? | Route guards and caching. | `catalog_access` unset. | Product Owner | Open
+?Q-72 | Hosting target and launch traffic: is Redis needed from day one? | Driver choice. | Database drivers until decided. | Product Owner / DevOps | Open
+?Q-73 | Account deletion and data retention rules? | GDPR erasure. | No deletion story; flagged for a later backlog item. | Product Owner / Legal | Open
+?Q-74 | How far ahead does "Prochainement" list upcoming campaigns? | Upcoming content. | `upcoming_horizon_hours` unset. | Product Owner | Open
+?Q-75 | Product name, brand identity and final route names? | Every page shows them; reference branding can't be used. | Shell built with neutral placeholders. | Product Owner | Open
+?Q-76 | Is a wishlist wanted? None was observed. | Possible new module. | No story; out of the backlog until decided. | Product Owner | Open
+?Q-77 | Discount rounding: floor, round half up, or entered by hand? | Displayed percentages. | PROPOSED floor in the generated column. | Product Owner | Open
+?Q-78 | What defines "popular", and does it need a region? | Popular rail. | PROPOSED reservation-count strategy, no region. | Product Owner | Open
+?Q-80 | With checkout OUT OF SCOPE, is the MVP an internal demo, a closed pilot or a public launch, and what does "Commander" do in it? | Decides whether reserved items can ever be bought, and which release gates apply. | US-041 blocked; US-065 needed only for a launch with real data. | Sponsor / Product Owner | Open (new, Phase 06)
+?Q-81 | What are the team's size, skills, sprint length and availability? | The sprint plan is only a sequence without them. | No dates or story points can be given. | Sponsor / Scrum Master | Open (new, Phase 06)
+?Q-82 | Which Git host, CI/CD platform and deployment environments will be used? | CI and environments are Sprint 0 work. | US-058 can't be finished. | Tech Lead / DevOps | Open (new, Phase 06)
+?Q-83 | What are the unsubscribe reason options? | FR-ACC-06 needs a list; values are UNKNOWN. | Seeded placeholders only. | Product Owner | Open (new, Phase 06)
+?Q-84 | How should root-category slug uniqueness be enforced, given MySQL treats NULL parents as distinct in UQ (parent_id, slug)? | Phase 05 schema erratum (R-07). | US-012 migration for `categories`. | Architect | Open (new, Phase 06)
+?Q-85 | Who writes and supplies MVP content (help articles, USP claims, footnotes, campaign and product images), and in what format? | Pages can't be accepted without content. | Placeholder content only. | Product Owner / Content | Open (new, Phase 06)
+?Q-86 | Which cookie-consent solution and which consent purposes? | FR-CNT-04 entry point exists; the tool is UNKNOWN. | US-052 can't be accepted. | Product Owner / DPO | Open (new, Phase 06)
+
+// ===================== E01 Authentication & Identity =====================
+@US-001 | E01 | Register as an adult member
+role: prospective member
+want: to create an account once, confirming that I am 18 or older and accepting the terms
+so: I can access the sales
+pri: Must
+status: Needs Clarification
+qs: Q-40, Q-41
+deps: US-059, US-060
+reqs: FR-ACC-08
+p04: US-26
+cls: MVP
+sprint: 1
+api: GET /sanctum/csrf-cookie; POST /api/v1/auth/register
+tables: users
+ac: Functional | Given a visitor without an account, when they submit first name, e-mail, password, confirmation, the adult confirmation and the terms acceptance, then the API answers 201 with the User and a session starts (AC-FR-ACC-08-2).
+ac: Validation | Given an e-mail that already has an account, when they register, then the API answers 422 `validation_failed` with field code `taken` and no second account is created (AC-FR-ACC-08-1).
+ac: Validation | Given `adult_confirmed` or `terms_accepted` not accepted, then 422 with field code `must_be_accepted` on that field (BR-15-02).
+ac: Validation | Given a password under 12 characters or not confirmed, then 422 on `password` (PROPOSED rule, api-contracts §2).
+ac: Error | Given no valid CSRF token, then 419 `csrf_token_mismatch`; given too many attempts, then 429 with `Retry-After`.
+ac: Authorization | Given a visitor who already has a session, then `/register` is not offered (guest-only route) and the endpoint refuses the request.
+ac: Pending | Social login and any further registration fields are not built until Q-40 and Q-41 are answered.
+be: Identity module: `RegistrationController`, `RegisterRequest`, `RegisterMember` action recording the accepted terms version
+be: Password hashing and the breached-password check (PROPOSED; drop it if the PO rejects it)
+bt: Feature tests: success, duplicate e-mail, unaccepted checkboxes, missing CSRF, throttling
+fe: `/register` page in `AuthLayout`; native HTML validation plus server error mapping (frontend-architecture §11)
+fe: RTK Query `register` mutation; on success, set the auth state from the response
+ft: Tests for field error mapping and the guest-only redirect
+
+@US-002 | E01 | Log in and log out with a protected session
+role: member
+want: to log in with my credentials and log out again
+so: my account and cart are reachable only through my own session
+pri: Must
+status: Needs Clarification
+qs: Q-40, Q-63
+deps: US-001
+reqs: FR-ACC-08, NFR-SEC-01, NFR-SEC-02
+p04: new (part of US-26)
+cls: MVP
+sprint: 1
+api: GET /sanctum/csrf-cookie; POST /api/v1/auth/login; POST /api/v1/auth/logout; GET /api/v1/me
+tables: users, sessions
+ac: Functional | Given valid credentials, when the member logs in, then 200 with the User, the session ID is regenerated and `GET /me` returns the member.
+ac: Error | Given an unknown e-mail or a wrong password, then 422 `invalid_credentials` with the same message in both cases (no account enumeration).
+ac: Error | Given repeated failures for the same e-mail and IP, then 429 `rate_limited` with `Retry-After`.
+ac: Functional | Given a logged-in member, when they log out, then 204, the session is invalidated and the CSRF token rotated; a later `GET /me` answers 401.
+ac: Security | Given any state-changing request without a valid `X-XSRF-TOKEN`, then it is rejected with 419 (AC-NFR-SEC-02-1).
+ac: Security | Given any API request for member data, then no member identifier appears in the URL and the response depends only on the session (AC-NFR-SEC-01-1).
+ac: Functional | Given a 401 on a member call, then the SPA clears its auth state, sends the member to `/login?redirect=` and returns them there after login.
+be: `SessionController` (login, logout), `LoginRequest` throttled per e-mail and IP, `CurrentUserController`
+be: Session and cookie settings per authentication-design §4 (HttpOnly, Secure, SameSite=Lax); lifetime read from config, value pending Q-63
+bt: Tests: login success, generic failure, throttling, logout invalidation; 419 on every unsafe route (route-list driven); architecture test that no route takes a user ID parameter
+fe: API client base query: CSRF cookie bootstrap, refresh and retry once on 419, redirect on 401 (frontend-architecture §8)
+fe: `/login` page; auth state loaded from `GET /me` at start-up
+ft: Tests for the single 419 retry and the 401 redirect with return path
+inf: Database session driver (baseline); env variables for session lifetime and secure cookies
+
+@US-003 | E01 | Reset a forgotten password
+role: member
+want: to receive a reset link and choose a new password
+so: I can get back into my account on my own
+pri: Must
+status: Needs Clarification
+qs: Q-40
+deps: US-002
+reqs: FR-ACC-08
+p04: new
+cls: MVP
+sprint: 1
+note: Derived from the Phase 05 PROPOSED security baseline (authentication-design §3.2), not from observed behaviour. Needed only if e-mail and password login is chosen (Q-40). PO to confirm.
+api: POST /api/v1/auth/forgot-password; POST /api/v1/auth/reset-password
+tables: users, password_reset_tokens
+ac: Functional | Given any e-mail, when a reset is requested, then the API answers 202 with the same response whether or not an account exists.
+ac: Functional | Given a valid token, when the member sets a new password that meets the registration rules, then 204 and the member's other sessions are invalidated.
+ac: Error | Given an invalid or expired token, then 422 `invalid_token`.
+ac: Error | Given repeated requests, then 429 with `Retry-After`.
+be: `PasswordResetController`; reset e-mail queued on `default`
+bt: Tests for non-enumeration, token expiry and session invalidation
+fe: `/forgot-password` and `/reset-password/:token` pages
+ft: Form tests
+inf: `mail` compose profile (Mailpit) for local e-mail capture; mail env variables
+
+@US-004 | E01 | Verify my e-mail address
+role: member
+want: to confirm my e-mail address from a signed link
+so: the store knows the address belongs to me
+pri: Should
+prio: Lowered from the Must of FR-ACC-08 because verification is a Phase 05 PROPOSED flow, not a Phase 04 requirement. PO to confirm.
+status: Needs Clarification
+qs: Q-40
+deps: US-001
+reqs: FR-ACC-08
+p04: new
+cls: Post-MVP
+sprint: 6
+api: POST /api/v1/auth/email/verification-notification; GET /api/v1/auth/email/verify/{id}/{hash}
+tables: users
+ac: Functional | Given a new member, then a verification e-mail with a signed link is queued.
+ac: Functional | Given a valid, unexpired signed link whose subject is the session user, when it is opened, then 204 and `email_verified` becomes true.
+ac: Error | Given an expired or tampered link, then 403 `invalid_signature` and the SPA offers to resend.
+ac: Pending | No feature is gated on a verified e-mail until the PO decides which ones are.
+be: `EmailVerificationController`; listener on `Registered` sends the queued e-mail
+bt: Signed-URL tests
+fe: `/verify-email` page and resend action
+ft: Tests
+inf: `queue` service running
+
+@US-005 | E01 | Apply one catalogue access mode
+role: product owner
+want: every catalogue route to follow one access setting, members only or public
+so: the membership rule can be decided without code changes
+pri: Must
+status: Needs Clarification
+qs: Q-71, Q-28, Q-03
+deps: US-002, US-059
+reqs: FR-ACC-08
+p04: new
+cls: MVP
+sprint: 1
+note: Implements contradiction C-05. Neither mode is confirmed; the help text suggests membership is required.
+api: GET /api/v1/storefront/settings; GET /api/v1/storefront/navigation
+ac: Functional | Given `catalog_access = members`, when a request without a session reaches a C route, then 401 `unauthenticated` and the SPA redirects to `/login?redirect=`.
+ac: Functional | Given `catalog_access = public`, when the same request is made, then the catalogue response is returned, while S routes (cart, account) still answer 401.
+ac: Functional | Given either mode, then help and legal pages (P routes) are reachable without a session.
+ac: Error | Given production with no value for `catalog_access`, then the settings endpoint answers 503 `settings_incomplete` (fail closed).
+be: `catalog.access` middleware on every C route; route groups by auth code S, C, P and G
+bt: Route-list test: every `/api/v1` route belongs to exactly one auth-code group
+fe: Route guards reading `catalog_access` from the settings
+ft: Guard tests for both modes
+inf: Env variable for `catalog_access`; production boot check
+
+// ===================== E02 User Account =====================
+@US-006 | E02 | Account navigation and overview
+role: member
+want: to reach every account section from one navigation and see my overview
+so: I can manage my account in one place
+pri: Should
+status: Ready
+deps: US-002, US-043
+reqs: FR-ACC-01, FR-ACC-02
+p04: US-19
+cls: Post-MVP
+sprint: 6
+api: GET /api/v1/account/overview
+tables: users
+ac: Functional | Given a logged-in member, then the "Votre compte" navigation lists the sections, each with its own `/myaccount/…` URL (AC-FR-ACC-01-1).
+ac: Functional | Given no updates, then "Vous n'avez pas d'actualisations" and "Accédez à nos ventes" are shown (AC-FR-ACC-02-1); `updates` is an empty list in v1.
+ac: Authorization | Given no session, then the endpoint answers 401 and the page redirects to login; the response carries `Cache-Control: no-store`.
+ac: Scope | "Adresses" isn't routed (C-02) and the external rewards link isn't built (FR-OOS-02).
+be: `AccountOverviewController` returning the first name and an empty `updates` list
+bt: Auth and no-store tests
+fe: `AccountLayout` with `AccountNav`; `/myaccount` redirects to `/myaccount/overview`; `AccountOverviewPage`
+ft: Navigation and empty-state tests
+
+@US-007 | E02 | Edit my personal details
+role: member
+want: to change the first name the store greets me with
+so: my details stay correct
+pri: Should
+status: Needs Clarification
+qs: Q-41
+deps: US-006
+reqs: FR-ACC-01
+p04: US-19
+cls: Post-MVP
+sprint: 6
+api: GET /api/v1/account/profile; PATCH /api/v1/account/profile
+tables: users
+ac: Functional | Given a member, when they save a first name of 1–100 characters, then 200 with the profile and the greeting uses the new name.
+ac: Validation | Given an empty or over-long first name, then 422 `validation_failed` on `first_name`.
+ac: Error | Given no CSRF token, then 419.
+ac: Pending | E-mail change and further fields are not built until Q-41 is answered.
+be: `ProfileController`, `UpdateProfileRequest`
+bt: Validation tests
+fe: `ProfilePage` at `/myaccount/personal-details`
+ft: Form tests
+
+@US-008 | E02 | Choose which sales e-mails I receive
+role: member
+want: to switch daily and weekly sales e-mails and personalisation on or off independently
+so: I control what I receive
+pri: Should
+status: Ready
+deps: US-006
+reqs: FR-ACC-05
+p04: US-17
+cls: Post-MVP
+sprint: 6
+note: Syncing preferences to a marketing tool is UNKNOWN (no tool chosen) and is not part of this story.
+api: GET /api/v1/account/newsletter; PUT /api/v1/account/newsletter
+tables: newsletter_preferences
+ac: Functional | Given the newsletter page, then "Ventes du jour", "Ventes de la semaine" and "Personnalisez vos newsletters" are independent checkboxes (AC-FR-ACC-05-1).
+ac: Functional | Given no change, then "Enregistrer" is disabled (AC-FR-ACC-05-2); after a change and save, the API answers 200 and the saved state is shown.
+ac: Validation | Given a missing or non-boolean field, then 422.
+ac: Functional | Given a member who had unsubscribed, when they save any option as true, then `unsubscribed_at` is cleared (PROPOSED rule, api-contracts §8).
+be: `NewsletterPreferenceController`, `UpdateNewsletterPreferencesRequest`, `UpdateNewsletterPreferences` action emitting `NewsletterPreferencesUpdated`
+bt: Tests, including the `unsubscribed_at` rule
+fe: `NewsletterPage` with dirty-state tracking for "Enregistrer"
+ft: Disabled-until-changed test
+
+@US-009 | E02 | Unsubscribe with a reason
+role: member
+want: to unsubscribe from sales e-mails by giving a reason
+so: I stop receiving them
+pri: Should
+status: Needs Clarification
+qs: Q-83
+deps: US-008
+reqs: FR-ACC-06
+p04: US-17
+cls: Post-MVP
+sprint: 6
+api: GET /api/v1/account/newsletter/unsubscribe-reasons; POST /api/v1/account/newsletter/unsubscribe
+tables: newsletter_preferences, unsubscribe_reasons
+ac: Functional | Given no reason selected, then "Se désabonner" is disabled; once a reason is selected it is enabled (AC-FR-ACC-06-1).
+ac: Functional | Given a selected active reason, when the member unsubscribes, then 200 and the preferences show the unsubscribed state.
+ac: Validation | Given no `reason_id`, then 422 with field code `reason_required`; given an unknown or inactive reason, then 422.
+ac: Pending | The reason options are PO content (Q-83); seeders use visibly labelled placeholders.
+be: `NewsletterUnsubscribeController`, `UnsubscribeRequest`, `Unsubscribe` action
+bt: Validation tests
+fe: Unsubscribe section with reason radios
+ft: Enable-on-select test
+
+@US-010 | E02 | Save my sizes
+role: member
+want: to save my sizes per gender and garment group
+so: I don't have to re-enter them
+pri: Should
+status: Ready
+deps: US-006, US-012
+reqs: FR-ACC-07
+p04: US-18
+cls: Post-MVP
+sprint: 6
+note: Whether saved sizes pre-filter listings (Q-39) is not part of this story.
+api: GET /api/v1/account/saved-sizes; PUT /api/v1/account/saved-sizes
+tables: saved_size_profiles, saved_size_values, garment_groups, size_systems, size_values
+ac: Functional | Given "Mes filtres", then tabs Femmes/Hommes show the garment groups with size-system radios and size checkboxes (AC-FR-ACC-07-1).
+ac: Functional | Given no change, then "Enregistrer" is disabled (AC-FR-ACC-07-2).
+ac: Validation | Given a size that doesn't belong to the profile's size system, then 422 with field code `size_not_in_system` on `profiles.<n>.size_value_ids`.
+ac: Validation | Given two profiles for the same gender and garment group, then 422.
+ac: Functional | Given a profile saved with no sizes, then that profile is deleted.
+be: `SavedSizeController`, `SaveSizeProfilesRequest`, `SaveSizeProfiles` action (replace in one transaction)
+bt: Tests for size-system membership and replace semantics
+fe: `SavedSizesPage` with tabs and groups
+ft: Form tests
+inf: Seeders for the garment groups listed in AC-FR-ACC-07-1
+
+@US-011 | E02 | Orders and returns entry pages
+role: member
+want: to find the orders and returns sections
+so: I know where after-sales will happen
+pri: Should
+status: Ready
+deps: US-006
+reqs: FR-ACC-03, FR-ACC-04
+p04: US-19
+cls: Post-MVP
+sprint: 6
+note: Empty states and entry pages only. Order data and the return and withdrawal flows belong to checkout (C-04, Q-04, Q-38) and are not built.
+ac: Functional | Given a member with no orders, then "Une fois vos commandes passées, vous pouvez les voir et les gérer ici." and "Achetez dès maintenant" are shown (AC-FR-ACC-03-1).
+ac: Functional | Given the returns page, then "commencez un retour" leads to `/myaccount/return/selection` and the empty state reads "Pas de retours récents" (AC-FR-ACC-04-1).
+ac: Functional | Given the footer "Rétractation" link, then it leads to the return selection in withdrawal mode, `?withdrawal=true` (AC-FR-ACC-04-2).
+ac: Scope | No order, return or withdrawal endpoint or table is created.
+be: None: no API by design (api-contracts §8)
+fe: `OrdersPage`, `ReturnsPage`, `ReturnSelectionPage` with static entry content and no API call
+ft: Route and copy tests
+
+// ===================== E03 Catalog Management =====================
+@US-012 | E03 | Catalogue data model
+role: development team
+want: the catalogue tables, models and factories built as designed
+so: brands, categories, sizes, products, images and attributes can be stored and queried
+pri: Must
+status: Blocked
+qs: Q-70, Q-84
+deps: US-061
+reqs: FR-PDP-01, FR-PDP-08, FR-CAT-04, FR-CAT-06, FR-BRD-01
+p04: new
+cls: MVP
+sprint: 1
+note: Q-70 decides whether a product is a model or a model + colour; the migrations can't be frozen before it. The root-slug erratum (R-07) is fixed here once Q-84 picks the method.
+tables: brands, categories, size_systems, size_values, products, product_images, product_variants, attributes, attribute_values, product_attribute_values
+ac: Data | Given the migrations, then every Catalog table, column, key and index in schema.md and indexing-strategy.md exists as documented, or the difference is an approved erratum.
+ac: Data | Given two root categories (no parent) with the same slug, when the second is saved, then it is refused (fix for R-07, method per Q-84).
+ac: Data | Given a product image, then its alt text is mandatory (input for NFR-A11Y-01).
+ac: Data | Given a category, then its materialised `path` is maintained when it is created or moved.
+ac: Architecture | Given the module dependency test, then Catalog depends on no other domain module.
+be: Migrations, models and factories for the Catalog tables, in per-module folders (backend-architecture §16)
+be: `CategoryTree` service maintaining `path`
+be: Root-slug uniqueness fix per Q-84; record the erratum against schema.md for architect approval
+bt: Constraint tests on MySQL 8, not SQLite
+
+// ===================== E04 Categories & Brands =====================
+@US-013 | E04 | Browse a category listing
+role: member
+want: to see a product type's live articles across sales
+so: I can shop by category
+pri: Must
+status: Ready
+deps: US-023, US-012
+reqs: FR-CAT-01, FR-CAT-04
+p04: US-03
+cls: MVP
+sprint: 3
+api: GET /api/v1/categories/{id}; GET /api/v1/articles; GET /api/v1/articles/facets
+tables: categories, campaign_articles
+ac: Functional | Given `/articles/categories/{id}`, then the category header and breadcrumb are shown, with the same tile, filter and sort controls as every listing context (AC-FR-CAT-01-1).
+ac: Functional | Given a category listing, then live articles of that category and its descendants are listed.
+ac: Functional | Given a category listing whose products carry "Longueur", then the "Longueur" filter is also shown (AC-FR-CAT-04-2); facets without values are omitted.
+ac: Error | Given an unknown category ID, then 404 and the not-found page.
+ac: Authorization | Given `catalog_access = members` and no session, then 401 and a redirect to login.
+be: `CategoryController` (header and breadcrumb from `path`); `category` context in `ArticleListingQuery` and `FacetQuery` using the `path` subtree
+bt: Query tests on seed data for descendants and live-only filtering
+fe: `CategoryListingPage` reusing the shared listing feature
+ft: Page test with a mocked API
+
+@US-014 | E04 | Browse a brand page
+role: member
+want: to open a brand's page from a product
+so: I see everything on sale from that brand
+pri: Should
+status: Ready
+deps: US-023
+reqs: FR-BRD-01, FR-BRD-02
+p04: US-07
+cls: MVP (pulled in)
+sprint: 4
+note: Pulled into the MVP sprints: the PDP brand heading must open `/brands/{code}` (AC-FR-PDP-01-2, a Must).
+api: GET /api/v1/brands/{code}; GET /api/v1/articles
+tables: brands
+ac: Functional | Given brand code B, then `/brands/B` lists live articles of B from several campaigns (AC-FR-BRD-01-1).
+ac: Functional | Given `/brands/{code}`, then the breadcrumb shows the brand's display name, never the internal code (AC-FR-BRD-02-1; reference defect M09 not copied).
+ac: Validation | Given a code that doesn't match `^[A-Za-z0-9-]{1,16}$`, then 422; given an unknown code, then 404.
+be: `BrandController`; `brand` context in the listing query
+bt: Tests
+fe: `BrandListingPage`
+ft: Breadcrumb test
+
+// ===================== E05 Campaign Management =====================
+@US-015 | E05 | Campaigns and landings with a derived lifecycle
+role: member
+want: sales to start and end exactly on time without anyone switching them
+so: what I see is always the current set of live sales
+pri: Must
+status: Blocked
+qs: Q-70, Q-77, Q-20, Q-33
+deps: US-012, US-061
+reqs: FR-CMP-05, FR-CMP-06, FR-CMP-07, FR-CMP-09, FR-CMP-10, FR-EVT-02
+p04: US-23, US-24 (reframed: the merchandiser persona is a HYPOTHESIS)
+cls: MVP
+sprint: 2
+note: Written from the member's view because the merchandiser persona is a HYPOTHESIS and no back-office is designed (Q-50). Data comes from seeders (US-064).
+tables: landings, landing_campaigns, campaigns, campaign_articles
+ac: Functional | Given a campaign with start S and end E, then it is upcoming before S, live from S to E and ended after E, computed from the request time with no stored state (AC-FR-CMP-09-1).
+ac: Functional | Given an upcoming campaign whose start passes, then it appears in its landing grids with no job involved (AC-FR-CMP-05-1); given a live campaign whose end passes, then it leaves every grid (AC-FR-CMP-05-2).
+ac: Functional | Given a campaign assigned to landings A and B, when it is live, then it appears in A, B and the default landing (AC-FR-EVT-02-1).
+ac: Functional | Given model M sold in campaigns C1 and C2, then two distinct article URLs exist, one under each campaign (AC-FR-CMP-07-1).
+ac: Functional | Given a theme or price-point campaign with articles of several brands, then it is stored and rendered like a brand campaign (AC-FR-CMP-10-1).
+ac: Data | Given a campaign article, then 0 < sale price ≤ RRP and `discount_percent` is generated with the single documented rule (PROPOSED floor, Q-77).
+ac: Pending | Launch slots (AC-FR-CMP-09-2) wait for Q-20 and Q-33; until then any datetime is accepted.
+be: Migrations, models and factories for the Sales tables
+be: `LiveCampaigns`: the single live predicate with a request-scoped clock (ADR-009)
+be: `sales:emit-boundaries` scheduled command with a stored watermark; `CampaignStarted` and `CampaignEnded` invalidate landing caches
+bt: Time-travel tests at S−1s, S, E−1s and E (shared harness with US-053)
+inf: `scheduler` service running `schedule:work`
+
+@US-016 | E05 | Event landing pages
+role: member
+want: to open the default landing or a vertical and see its live sales
+so: I only see the sales relevant to me
+pri: Must
+status: Ready
+deps: US-015, US-043, US-064
+reqs: FR-EVT-01, FR-EVT-02, FR-EVT-04
+p04: US-01, US-02
+cls: MVP
+sprint: 2
+note: The hero's link target is a HYPOTHESIS (Q-13) and is not part of this story; the hero is rendered without a decided target.
+api: GET /api/v1/landings/{landing}
+tables: landings, landing_campaigns
+ac: Functional | Given an existing landing ID, when `/event/{id}` is requested, then that landing is rendered (AC-FR-EVT-01-1).
+ac: Functional | Given `/event`, then the default landing is rendered with the same campaign set as the "all sales" landing (AC-FR-EVT-01-2); `/` redirects to `/event`.
+ac: Functional | Given an upcoming campaign, then it appears in no landing grid (AC-FR-EVT-02-2).
+ac: Functional | Given a vertical landing with a hero, then exactly one hero is shown above the grid; given `/event`, then no hero is shown (AC-FR-EVT-04-1, AC-FR-EVT-04-2).
+ac: Validation | Given a landing parameter that is neither digits nor `default`, then 422; given an unknown ID, then 404 and the not-found page.
+be: `LandingController` and `LandingView`: section flags, hero, grid ordered by position then `starts_at` descending
+bt: Tests for live-only grids and hero rules
+fe: `LandingPage` with `CampaignGrid` and `Hero`; redirect from `/`
+ft: Page tests for the aggregate and vertical types
+
+@US-017 | E05 | Campaign tile with headline and countdown
+role: member
+want: each live sale to show its discount and the time left
+so: I can decide quickly what to look at before it ends
+pri: Must
+status: Needs Clarification
+qs: Q-23, Q-24, Q-77
+deps: US-016, US-046
+reqs: FR-CMP-01, FR-CMP-02, FR-CMP-03, FR-CMP-04
+p04: US-01
+cls: MVP
+sprint: 2
+api: GET /api/v1/landings/{landing}; GET /api/v1/campaigns/{campaign}
+tables: campaigns, campaign_articles
+ac: Functional | Given a live campaign, then its tile shows name, image, headline and "Se termine dans <countdown>", and activating the tile heading opens `/campaigns/{id}` (AC-FR-CMP-01-1, AC-FR-CMP-01-2).
+ac: Functional | Given ≥ 1 day remaining, then the countdown reads like "2 jours 7 heures 25 minutes"; given < 1 day, then it shows hours, minutes and seconds (AC-FR-CMP-02-1, AC-FR-CMP-02-2).
+ac: Functional | Given a percentage headline, then the tile shows "Économisez jusqu'à* N%" and the footer defines "*" against the RRP (AC-FR-CMP-03-1).
+ac: Functional | Given a campaign flagged "Special", then the tile shows "Special" and no percentage (AC-FR-CMP-04-1).
+ac: Functional | Given a wrong client clock, then the countdown still matches server time, computed from `meta.server_time`.
+ac: Pending | How N is computed (Q-23), when "Special" applies (Q-24) and the rounding rule (Q-77) need PO answers before acceptance.
+be: `CampaignHeadline` for the computed, manual and special modes of `headline_mode`; `CampaignController` header
+bt: Headline tests for each mode
+fe: `CampaignTile` and `Countdown` using `useServerNow`
+ft: Countdown format tests at the 1-day boundary with a mocked server offset
+
+@US-018 | E05 | Upcoming sales
+role: member
+want: to see upcoming sales and when they start
+so: I can come back at the right time
+pri: Should
+status: Needs Clarification
+qs: Q-35, Q-74, Q-27
+deps: US-016, US-017
+reqs: FR-UPC-01, FR-UPC-02, FR-UPC-03
+p04: US-14
+cls: Post-MVP
+sprint: 6
+api: GET /api/v1/campaigns/upcoming
+tables: campaigns
+ac: Functional | Given an upcoming campaign within the horizon, then it appears in "Prochainement" with name, image and start time, and its tile has no link (AC-FR-UPC-01-1, AC-FR-UPC-01-2).
+ac: Functional | Given a start within `upcoming_relative_threshold_minutes`, then the tile reads "Démarre dans …"; beyond it, "Démarre le <day> <date> <hh:mm>" (AC-FR-UPC-02-1, AC-FR-UPC-02-2).
+ac: Functional | Given two landings that show the section, then both show the same entries in the same order (AC-FR-UPC-03-1).
+ac: Authorization | Given a direct request for an upcoming campaign, then 404 (PROPOSED server-side rule).
+ac: Pending | The threshold (Q-35), the horizon (Q-74) and global vs per-landing (Q-27) are PO values.
+be: `UpcomingCampaignController` and `UpcomingCampaigns` within `upcoming_horizon_hours`; literal route registered before `/campaigns/{campaign}`
+bt: Route-order test; horizon test
+fe: `UpcomingSection` with the relative and absolute formats
+ft: Threshold boundary tests
+
+@US-019 | E05 | Merchandised order in a landing grid
+role: member
+want: the landing grid to follow the order the store sets
+so: featured sales are shown first
+pri: Could
+status: Needs Clarification
+qs: Q-50
+deps: US-016
+reqs: FR-EVT-03
+p04: US-23
+cls: Blocked
+sprint: 7
+note: HYPOTHESIS, pending PO validation.
+tables: landing_campaigns
+ac: Functional | Given an order set for a landing, then the grid renders campaigns in that order (AC-FR-EVT-03-1); campaigns without a position follow by `starts_at` descending (PROPOSED).
+be: Use `landing_campaigns.position` in `LandingView` (already in the query order); seed positions
+bt: Ordering test
+
+@US-020 | E05 | Curated landing template
+role: member
+want: curated landings to show only their own content
+so: the page stays focused
+pri: Could
+status: Needs Clarification
+qs: Q-16
+deps: US-016, US-018, US-051
+reqs: FR-EVT-05
+p04: US-23
+cls: Blocked
+sprint: 7
+note: HYPOTHESIS, pending PO validation.
+api: GET /api/v1/landings/{landing}
+ac: Functional | Given a landing of the curated type, then neither the upcoming section nor the footer is rendered (AC-FR-EVT-05-1), driven by `sections.upcoming` and `sections.footer` from the API.
+be: The `curated` type sets both section flags to false
+fe: Layout honours the section flags
+ft: Test
+
+@US-021 | E05 | Refuse reservations outside a campaign's live window
+role: member
+want: ended sales to stop accepting reservations
+so: I don't reserve something that can no longer be sold
+pri: Could
+status: Needs Clarification
+qs: Q-17, Q-21
+deps: US-037
+reqs: FR-CMP-08
+p04: US-23
+cls: Blocked
+sprint: 7
+note: HYPOTHESIS, built behind the `enforce_live_window_on_add` switch. The 410 `campaign_ended` reads are PROPOSED (Q-17).
+api: POST /api/v1/cart/items; GET /api/v1/campaigns/{campaign}; GET /api/v1/campaigns/{campaign}/articles/{sku}
+ac: Functional | Given the switch on and an article whose campaign has ended, when the member tries to add it, then 409 `campaign_not_live` and nothing is reserved (AC-FR-CMP-08-1).
+ac: Functional | Given an ended campaign or article URL, then the API answers 410 `campaign_ended` and the SPA shows a message with a link to `/event` (PROPOSED).
+ac: Functional | Given the switch off, then the add guard is skipped.
+be: Guard step (1) of `AddToCart` behind the switch; 410 handling in campaign and article reads
+bt: Switch on and off tests
+fe: Toast and refetch on `campaign_not_live`; ended-campaign message
+ft: Error-code mapping tests
+
+@US-022 | E05 | Ask to be notified when a sale starts
+role: member
+want: to be notified when an upcoming sale starts
+so: I don't miss it
+pri: Could
+status: Blocked
+qs: Q-47, Q-01
+deps: US-018
+reqs: FR-UPC-04
+p04: US-15
+cls: Blocked
+sprint: B
+note: HYPOTHESIS and not designed in Phase 05 (api-contracts §11). No tasks until Q-47 gives the channel, stored data, confirmation and unsubscribe rules.
+ac: Pending | Given an upcoming tile, then an "Informez moi" button is shown (AC-FR-UPC-04-1). The behaviour behind it is not specified and must not be invented.
+
+// ===================== E06 Product Listing =====================
+@US-023 | E06 | Campaign listing with tiles and pages
+role: member
+want: to open a sale and browse its articles with RRP and sale price
+so: I can find what I want inside the sale
+pri: Must
+status: Needs Clarification
+qs: Q-11, Q-12
+deps: US-015, US-017, US-064
+reqs: FR-CAT-01, FR-CAT-02, FR-CAT-09, FR-CMP-06
+p04: US-01, US-08
+cls: MVP
+sprint: 3
+api: GET /api/v1/campaigns/{campaign}; GET /api/v1/articles
+tables: campaign_articles, products, product_images, brands
+ac: Functional | Given `/campaigns/{id}` for a live campaign, then the header shows its name and the listing shows the shared tile, filter and sort controls (AC-FR-CAT-01-1).
+ac: Functional | Given any listing, then each tile shows the RRP and the sale price with their labels and links to `/campaigns/{campaignId}/articles/{sku}` (AC-FR-CAT-02-1, AC-FR-CMP-06-1).
+ac: Functional | Given a context with more than 60 products, then 60 tiles are rendered on first load and `meta.page.total` gives the full count (AC-FR-CAT-09-1).
+ac: Validation | Given `page[size]` above `listing_page_size` or an unknown query key, then 422 `validation_failed`.
+ac: Error | Given an unknown, draft or not-yet-started campaign, then 404; given an ended campaign, then 410 `campaign_ended` (PROPOSED, Q-17).
+ac: Pending | Getting past the first page (control or infinite scroll, Q-11) and the countdown placement on the campaign page (Q-12) are open; the API is page-based either way.
+be: `ArticleListingController` and `ArticleListingQuery` with the campaign context, live predicate and page-based pagination
+bt: Query tests on seed data; pagination meta and links
+fe: Shared listing feature: `ArticleGrid`, `ArticleTile`, query state in the URL; `CampaignListingPage`
+ft: Tile rendering and URL-state tests
+
+@US-024 | E06 | Sort a listing
+role: member
+want: to sort a listing
+so: I see the cheapest, newest or most discounted articles first
+pri: Must
+status: Needs Clarification
+qs: Q-43
+deps: US-023
+reqs: FR-CAT-03
+p04: US-04
+cls: MVP
+sprint: 3
+api: GET /api/v1/articles
+ac: Functional | Given a fresh listing, then "Préférés" is selected (AC-FR-CAT-03-1).
+ac: Functional | When the member opens "Tri", then exactly the five options are shown as radios, with Retirer, Fermer and Appliquer (AC-FR-CAT-03-2); applying one reloads the listing in that order.
+ac: Validation | Given a `sort` value outside the five, then 422.
+ac: Pending | What "Préférés" ranks by is UNKNOWN (Q-43); the placeholder is merchandising position, then newest.
+be: Sort clauses for `newest`, `preferred`, `price_asc`, `price_desc` and `discount`, each backed by an index
+bt: Ordering test per option
+fe: `SortDialog`: accessible dialog with radios
+ft: Dialog keyboard test
+
+@US-025 | E06 | Filter a listing
+role: member
+want: to filter a listing by category, size, brand, composition, colour and price
+so: I only see articles I can buy
+pri: Must
+status: Needs Clarification
+qs: Q-14
+deps: US-023
+reqs: FR-CAT-04
+p04: US-05, US-03
+cls: MVP
+sprint: 3
+api: GET /api/v1/articles; GET /api/v1/articles/facets
+tables: attributes, attribute_values, product_attribute_values, product_variants
+ac: Functional | Given a campaign listing, then the filter group shows catégories, Taille, Marque, Composition, Couleur, Prix and Tri (AC-FR-CAT-04-1).
+ac: Functional | Given a filter applied, then the listing reloads with only matching live articles and the filter state is in the URL (PROPOSED, frontend-architecture), so the page can be reloaded or shared.
+ac: Validation | Given `filter[price_min]` above `filter[price_max]`, then 422 with field code `min_greater_than_max`; given an unknown size, brand or attribute value, then 422.
+ac: Functional | Given facet counts, then each facet's counts ignore that facet's own filter.
+ac: Pending | The content of the Marque, Couleur, Composition and catégories dialogs wasn't observed (Q-14); the facets return what the data holds.
+be: `FacetQuery`; filter clauses in `ArticleListingQuery`; `ListArticlesRequest` validation
+bt: Facet count tests (self-exclusion) and validation tests
+fe: `FilterBar` and filter dialogs; URL-to-filter mapping
+ft: URL round-trip tests
+
+@US-026 | E06 | Filter dialog refinements
+role: member
+want: to see the result count before applying, pick sizes by system, set a price range and reset filters
+so: filtering is quick and predictable
+pri: Should
+status: Ready
+deps: US-025
+reqs: FR-CAT-05, FR-CAT-06, FR-CAT-07, FR-CAT-08
+p04: US-05
+cls: Post-MVP
+sprint: 6
+api: GET /api/v1/articles/facets
+ac: Functional | Given an open filter dialog, then the confirm button reads "Afficher <N> résultats" from the facet total, and the listing doesn't change until it is pressed (AC-FR-CAT-05-1).
+ac: Functional | Given a shoe campaign, when "Taille" opens, then a "Chaussures" tab lists size checkboxes, including half sizes (AC-FR-CAT-06-1).
+ac: Functional | Given prices spanning 8–299 €, when "Prix" opens, then Prix minimum shows 8 and Prix maximum shows 299 (AC-FR-CAT-07-1), labelled "Max", never "Maks".
+ac: Functional | Given a dialog with no selection, then "Retirer" is disabled; given active filters, then "Vos filtres" shows the article count with "Réinitialiser" (AC-FR-CAT-08-1, AC-FR-CAT-08-2).
+be: None beyond US-025: facets already return the total, size systems and price bounds
+fe: Pending-selection state per dialog; debounced facet total on change; size tabs; price inputs
+ft: Tests for the count button and the "Retirer" state
+
+@US-027 | E06 | "Réservé" state on tiles
+role: member
+want: to see when an article's remaining units are all reserved
+so: I know whether it's worth waiting
+pri: Must
+status: Needs Clarification
+qs: Q-45
+deps: US-023, US-036
+reqs: FR-STK-01
+p04: US-22
+cls: MVP
+sprint: 3
+api: GET /api/v1/articles
+tables: inventory_items
+ac: Functional | Given an article with no available unit but at least one reserved unit, then its tile shows "Réservé" (AC-FR-STK-01-2, PROPOSED `availability` rule).
+ac: Functional | Given an article with no available and no reserved unit, then its tile shows the sold-out state (copy UNKNOWN).
+ac: Pending | Exactly when "Réservé" applies (all units, some units, or the member's own) is Q-45.
+be: `availability` computed from inventory in the listing query
+bt: Tests for the three states
+fe: Tile badge
+ft: Badge tests
+
+@US-028 | E06 | "Dernières heures" badge
+role: member
+want: tiles to warn me when a sale is about to end
+so: I act in time
+pri: Could
+status: Needs Clarification
+qs: Q-36
+deps: US-023, US-017
+reqs: FR-STK-03
+p04: US-22
+cls: Blocked
+sprint: 7
+note: HYPOTHESIS, behind the `last_hours_badge` switch.
+ac: Functional | Given the switch on and a campaign ending within `last_hours_badge_threshold_hours`, then its tiles show "Dernières heures" (AC-FR-STK-03-1), computed from `campaign_ends_at` and server time.
+ac: Functional | Given the switch off, then no badge is shown.
+be: Switch and threshold exposed in the settings (already in the Settings shape)
+fe: Badge logic in `ArticleTile` using `useServerNow`
+ft: Threshold boundary test
+
+@US-029 | E06 | Link-source attribution
+role: product owner
+want: product links to carry the surface they were clicked from
+so: consent-gated analytics can attribute traffic
+pri: Could
+status: Ready
+deps: US-023
+reqs: FR-ANL-01
+p04: new
+cls: Post-MVP
+sprint: 7
+ac: Functional | Given a product link in a campaign listing, then it carries the source surface as a neutral `src=` parameter (AC-FR-ANL-01-1, frontend-architecture §15.1).
+ac: Functional | Given the parameter, then the API ignores it, so responses and cache keys don't change.
+ac: Privacy | Given no analytics consent, then the parameter is not passed to any analytics tool (NFR-PRV-01).
+be: None: the API ignores the parameter
+fe: Add `src` to tile links per surface
+ft: Link tests
+
+// ===================== E07 Product Details =====================
+@US-030 | E07 | Product detail page
+role: member
+want: to see an article's prices, sizes, details, delivery window and returns
+so: I can decide whether to buy
+pri: Must
+status: Needs Clarification
+qs: Q-31, Q-49
+deps: US-023, US-036
+reqs: FR-PDP-01, FR-PDP-06, FR-PDP-07, FR-PDP-08, FR-PRC-01
+p04: US-08
+cls: MVP
+sprint: 4
+api: GET /api/v1/campaigns/{campaign}/articles/{sku}
+tables: campaign_articles, products, product_variants, product_images, inventory_items
+ac: Functional | Given an article URL, then every element listed in FR-PDP-01 is present (AC-FR-PDP-01-1), and activating the brand heading opens `/brands/{code}` (AC-FR-PDP-01-2).
+ac: Functional | Given an article, then the sale price and the RRP are both shown in French formatting, e.g. "115,00 €" (AC-FR-PRC-01-1).
+ac: Functional | Given a shoe article, then sizes such as "38 2/3" and "39 1/3" are selectable radios (AC-FR-PDP-08-1).
+ac: Functional | Given an article with a lead time, then a delivery window "<date> - <date>" is shown; without one, no window is shown (AC-FR-PDP-06-1; computation Q-49).
+ac: Functional | Given an article, then the returns statement shows the single `return_period_days`, identical to the help and terms pages (AC-FR-PDP-07-1).
+ac: Error | Given an SKU not in this campaign or a not-yet-started campaign, then 404; given an ended campaign, then 410 (PROPOSED).
+ac: Caching | Given the response, then it carries `Cache-Control: no-store` because it contains availability.
+be: `CampaignArticleController` and `ArticleLookup`; `DeliveryEstimator` seam returning null when no lead time is set
+bt: Tests for the 404 cases and the response shape against api-contracts
+fe: `ProductPage`: gallery, price block, `SizeSelector` radios, accordions, delivery and returns blocks
+ft: Rendering tests; keyboard size selection
+
+@US-031 | E07 | Low-stock indicator
+role: member
+want: to see when only a few units of a size are left
+so: I know when to act
+pri: Must
+status: Needs Clarification
+qs: Q-26
+deps: US-030
+reqs: FR-PDP-05, NFR-I18N-02
+p04: US-08, US-22
+cls: MVP
+sprint: 4
+api: GET /api/v1/campaigns/{campaign}/articles/{sku}
+tables: inventory_items
+ac: Functional | Given a size with 0 < available ≤ `low_stock_threshold`, then its label reads "Plus que <N> disponible(s)" with N the current available units (AC-FR-PDP-05-1).
+ac: Functional | Given stock changes, then N reflects the new value on the next render (AC-FR-PDP-05-2); the PDP response is never cached.
+ac: Localisation | Given N = 1, then "Plus que 1 disponible"; given N > 1, then "Plus que N disponibles" (AC-NFR-I18N-02-1).
+ac: Pending | The threshold is a PO setting (Q-26).
+be: `low_stock_quantity` per size from `quantity_available`
+bt: Threshold boundary tests
+fe: Size label using `Intl.PluralRules('fr-FR')`
+ft: Plural tests
+
+@US-032 | E07 | Size required before adding
+role: member
+want: to be told to pick a size if I forget
+so: I don't reserve the wrong item
+pri: Must
+status: Ready
+deps: US-030
+reqs: FR-PDP-02
+p04: US-09
+cls: MVP
+sprint: 4
+api: POST /api/v1/cart/items
+ac: Functional | Given no size selected, when the member clicks "Ajouter au panier", then the alert "Choisissez une taille" is shown and announced to screen readers, and nothing is added (AC-FR-PDP-02-1, AC-NFR-A11Y-01-2).
+ac: Validation | Given a request without `variant_id`, then 422 with field code `size_required` and the message "Choisissez une taille", so the rule holds even if the UI is bypassed.
+ac: Validation | Given a `variant_id` that doesn't belong to the SKU's product, then 422.
+be: `AddCartItemRequest` rules
+bt: Validation tests
+fe: Client-side guard with a live-region alert
+ft: Announcement test
+
+@US-033 | E07 | Button after adding an article
+role: member
+want: the add button to reflect that the article is already in my cart
+so: I don't add it again by mistake
+pri: Could
+status: Needs Clarification
+qs: Q-46
+deps: US-037
+reqs: FR-PDP-04
+p04: new
+cls: Blocked
+sprint: 7
+note: HYPOTHESIS, behind the `hide_add_button_after_add` switch. The per-member limit itself is enforced in US-037.
+api: GET /api/v1/campaigns/{campaign}/articles/{sku}
+ac: Functional | Given the switch on and the article just added, then "Ajouter au panier" is not offered again for it (AC-FR-PDP-04-1), using `in_cart`.
+ac: Pending | What replaces the button after adding is Q-46.
+be: `in_cart` flag on the article detail
+fe: Button visibility rule behind the switch
+ft: Test
+
+// ===================== E08 Search =====================
+@US-034 | E08 | Brand suggestions while typing
+role: member
+want: brand suggestions as I type in the search box
+so: I quickly find a brand's articles in every live sale
+pri: Must
+status: Needs Clarification
+qs: Q-44
+deps: US-035, US-043
+reqs: FR-SRC-01
+p04: US-06
+cls: MVP
+sprint: 5
+api: GET /api/v1/search/suggestions
+tables: brands
+ac: Functional | Given the member types "nike", then a listbox of brand suggestions such as Nike, Nike Sportswear and Nike SB is shown (AC-FR-SRC-01-1), with at most 10 brands that have live articles.
+ac: Functional | Given the suggestions, when the member selects one, then the search results listing opens (AC-FR-SRC-02-1).
+ac: Accessibility | Given keyboard use, then the input follows the ARIA combobox pattern, with French labels only (NFR-I18N-01; reference defect M08 not copied).
+ac: Validation | Given `q` empty or over 100 characters, then 422.
+ac: Pending | Minimum length, Enter behaviour, other suggestion types and the no-results state are Q-44.
+be: `SearchSuggestionController`; brand-name prefix query
+bt: Tests
+fe: `SearchCombobox` in the header, debounced
+ft: Combobox keyboard tests
+
+@US-035 | E08 | Search results across campaigns
+role: member
+want: a listing of a brand's or query's live articles from every sale
+so: I see everything relevant in one place
+pri: Must
+status: Needs Clarification
+qs: Q-44
+deps: US-023
+reqs: FR-SRC-02
+p04: US-06
+cls: MVP
+sprint: 5
+api: GET /api/v1/articles
+tables: products
+ac: Functional | When the member selects "Nike Sportswear", then `/search-catalog?query=` lists live articles from several campaigns with the shared listing component (AC-FR-SRC-02-1).
+ac: Functional | Given a product or brand change, then `products.search_text` is rebuilt so results stay current (ADR-008).
+ac: Validation | Given `q` longer than 100 characters, then 422.
+ac: Pending | The no-results state and the Enter behaviour are Q-44.
+be: `q` context with FULLTEXT on `products.search_text`; queued `RebuildProductSearchText` listener
+bt: Search tests on seed data; listener test
+fe: `SearchResultsPage`
+ft: Page test
+inf: `queue` service for the rebuild listener
+
+// ===================== E09 Inventory Management =====================
+@US-036 | E09 | Atomic stock reservation and release
+role: member
+want: a unit I reserve to be truly mine, with stock fair for everyone
+so: two members can never hold the same last unit
+pri: Must
+status: Needs Clarification
+qs: Q-70
+deps: US-015
+reqs: NFR-CON-01, FR-STK-01, FR-STK-02
+p04: new
+cls: MVP
+sprint: 3
+note: The stock scope, campaign article × size, is PROPOSED (C-07, ADR-005) and depends on Q-70.
+tables: inventory_items
+ac: Concurrency | Given two members adding the last unit at the same moment, then exactly one reservation succeeds and the other gets 409 `out_of_stock` (AC-NFR-CON-01-1, AC-FR-STK-01-1).
+ac: Data | Given any sequence of reserves and releases, then `quantity_reserved + quantity_sold ≤ quantity_allocated` always holds and `quantity_available` is never negative.
+ac: Functional | Given an article sold out, then its stock isn't replenished within the campaign (AC-FR-STK-02-1): no API endpoint or job raises `quantity_allocated`.
+ac: Functional | Given a release, then `quantity_reserved` decreases by exactly the released quantity, once.
+be: `inventory_items` migration and model; `ReserveUnit` as one conditional atomic update; `ReleaseUnit`; `AvailabilityFor`
+bt: Parallel-connection test on MySQL (harness from US-053); invariant tests
+inf: MySQL service in CI (US-058)
+
+// ===================== E10 Cart & Reservations =====================
+@US-037 | E10 | Reserve an article in my cart
+role: member
+want: to reserve a size in my cart and see the time left
+so: nobody else takes it while I decide
+pri: Must
+status: Needs Clarification
+qs: Q-25, Q-32, Q-46, Q-51
+deps: US-032, US-036, US-002
+reqs: FR-PDP-03, FR-CRT-02, FR-NAV-05
+p04: US-10
+cls: MVP
+sprint: 4
+api: POST /api/v1/cart/items; GET /api/v1/cart
+tables: cart_reservations, inventory_items
+ac: Functional | Given a size with an available unit, when the member clicks "Ajouter au panier", then 201 with the Cart, a success alert is shown and the cart button reads "Votre panier - 1 Article - <mm> minutes et <ss> secondes restantes" (AC-FR-PDP-03-1, AC-FR-NAV-05-1).
+ac: Functional | Given an item added at T, then the cart title shows remaining = `reservation_minutes` − (now − T), from server time (AC-FR-CRT-02-1; the reference used 20 minutes).
+ac: Functional | Given an empty cart, then the cart button shows no count and no timer (AC-FR-NAV-05-2).
+ac: Error | Given no unit left, then 409 `out_of_stock`, a toast, and the article is refetched.
+ac: Error | Given the member would exceed `max_quantity_per_article`, then 409 `reservation_limit_reached`.
+ac: Authorization | Given no session, then 401 and login with a return to the article; the body never carries a user ID; CSRF is required (419 otherwise).
+ac: Functional | Given an expired, not yet swept reservation for the same SKU and size, when the member adds it again, then the stale row is released first in the same transaction, so stock doesn't leak and the limit isn't hit (ADR-010).
+ac: Pending | Duration (Q-25), per-item or shared timer (Q-32), the limit (Q-46) and the success copy (Q-51) are PO values.
+be: `CartItemController@store`; `AddToCart` steps 1–6 (backend-architecture §6.1); `ReservationCreated` emitted after commit
+bt: Tests: success, out of stock, limit reached, re-add after expiry, missing CSRF, 401
+fe: Add-to-cart mutation updating the cart cache (RTK Query tags); `CartButton` with count and countdown
+ft: Countdown from the server offset; toast per error code
+
+@US-038 | E10 | View my cart
+role: member
+want: to see my reserved items, my saving and my total
+so: I know what I'm about to order
+pri: Must
+status: Ready
+deps: US-037
+reqs: FR-CRT-01, FR-CRT-03, FR-CRT-05, FR-CRT-06, FR-PRC-02
+p04: US-11
+cls: MVP
+sprint: 4
+note: The packaging fee amount (Q-30) is a setting and is never added to the total: charging it is checkout (OUT OF SCOPE).
+api: GET /api/v1/cart
+tables: cart_reservations
+ac: Functional | When the member activates "Votre panier", then a dialog opens, the page URL doesn't change and close buttons dismiss it (AC-FR-CRT-01-1, AC-FR-CRT-01-2).
+ac: Functional | Given one reserved item, then its line shows every FR-CRT-03 field under the "Réservé" label (AC-FR-CRT-03-1).
+ac: Functional | Given one line at 115,00 € with RRP 250,00 €, then the summary shows "Vous économisez 135,00 €" and "Somme totale 115,00 €", and the line shows "-54%" (AC-FR-CRT-05-1).
+ac: Functional | Given a non-empty cart, then the summary says "Taxe sur la valeur ajoutée incluse, hors emballage & manutention" (AC-FR-PRC-02-1).
+ac: Functional | Given no reserved items, when the cart opens, then the empty-state text is shown (AC-FR-CRT-06-1); expired reservations are never listed.
+ac: Caching | Given the cart response, then it carries `Cache-Control: no-store` (AC-NFR-SEC-03-1).
+be: `CartController@show`; `GetCart` with active rows only, savings and total in cents
+bt: Money computation tests in integer cents
+fe: `CartDrawer`: accessible dialog with focus trap and focus return
+ft: Dialog accessibility tests; summary formatting
+
+@US-039 | E10 | Remove an item after confirming
+role: member
+want: to remove an item after a confirmation
+so: I don't remove it by mistake, and it goes back to other shoppers
+pri: Must
+status: Ready
+deps: US-038
+reqs: FR-CRT-04
+p04: US-12
+cls: MVP
+sprint: 4
+api: DELETE /api/v1/cart/items/{id}
+tables: cart_reservations, inventory_items
+ac: Functional | When the member clicks remove, then the alertdialog "Retirer l’article du panier" explains the unit becomes available to others, with Supprimer and Annuler (AC-FR-CRT-04-1).
+ac: Functional | When the member confirms "Supprimer", then the item leaves the cart and the unit is available again (AC-FR-CRT-04-2); when they choose "Annuler", the cart is unchanged (AC-FR-CRT-04-3).
+ac: Authorization | Given another member's or an expired reservation ID, then 404, so ownership isn't disclosed; CSRF is required.
+be: `CartItemController@destroy`; `RemoveFromCart`; `CartReservationPolicy`
+bt: Ownership and release tests
+fe: `ConfirmRemoveDialog` (alertdialog)
+ft: Confirm and cancel tests
+
+@US-040 | E10 | Release expired reservations
+role: member
+want: reservations that run out to return their units to stock
+so: stock stays fair for everyone
+pri: Could
+status: Needs Clarification
+qs: Q-37, Q-32
+deps: US-037
+reqs: FR-CRT-08
+p04: US-25
+cls: Blocked
+sprint: 4
+note: HYPOTHESIS (Phase 04 Could) but an MVP-critical decision: without expiry a reserved unit never returns to other members (C-08, R-01). Built behind `release_expired_reservations`; the PO decides before the MVP release.
+tables: cart_reservations, inventory_items
+ac: Functional | Given the switch on and a reservation older than `reservation_minutes`, then the item is no longer in the cart and the unit is available to others (AC-FR-CRT-08-1).
+ac: Functional | Given the sweep, then it runs every minute and releases expired rows in batches of at most 500, one transaction per batch, emitting `ReservationReleased(expired)`.
+ac: Functional | Given an expired row not yet swept, then it is never shown in the cart and doesn't count against the limit.
+ac: Pending | What the member sees when a reservation expires (Q-37) is not designed; no notification is built.
+be: `cart:release-expired` command running `ReleaseExpiredReservations` (backend-architecture §6.1); scheduler entry
+bt: Time-travel tests; sweep racing with remove and re-add (R-05)
+fe: Refetch the cart when the header countdown reaches zero
+ft: Test
+inf: Scheduler health monitoring (R-06)
+
+@US-041 | E10 | Hand-off button from cart to checkout
+role: member
+want: to go from my cart towards ordering
+so: I can order my reserved items
+pri: Must
+status: Blocked
+qs: Q-04, Q-80
+deps: US-038
+reqs: FR-CRT-07
+p04: US-13
+cls: MVP
+sprint: 5
+note: Checkout and payment (M21) are OUT OF SCOPE. This story covers the button only; no order table, endpoint or payment integration is created, and the boundary contracts stay outlines (api-contracts §10).
+ac: Functional | Given a non-empty cart, then "Commander (<N> Article)" is shown (AC-FR-CRT-07-1).
+ac: Pending | Where the button leads is undecided: no checkout is in scope (Q-04), and what the MVP does instead is Q-80.
+ac: Scope | Given the codebase, then no checkout or payment endpoint, table or third-party integration exists (FR-OOS-01).
+be: None until Q-04; `ActiveReservationsForCheckout` and `MarkSold` stay contract outlines
+fe: "Commander (<N> Article)" button with the target chosen under Q-80
+ft: Label and count test
+
+@US-042 | E10 | Throttle bulk add-to-cart
+role: member
+want: automated bulk reservations to be slowed down
+so: scripts can't hoard limited stock
+pri: Could
+status: Needs Clarification
+qs: Q-42
+deps: US-037
+reqs: NFR-SEC-05
+p04: new
+cls: Blocked
+sprint: 7
+note: HYPOTHESIS. Placeholder rate limits are designed; any bot challenge is pending Q-42.
+api: POST /api/v1/cart/items
+ac: Functional | Given automated bulk add-to-cart attempts from one session or IP, then they are throttled with 429 `rate_limited` and `Retry-After` (AC-NFR-SEC-05-1).
+ac: Pending | Limit values and any challenge mechanism are Q-42.
+be: Named rate limiter on `POST /cart/items`
+bt: Throttle test
+fe: 429 handling that waits for `Retry-After`
+
+// ===================== E11 Storefront UI =====================
+@US-043 | E11 | App shell and header
+role: member
+want: the same header on every page, with search, account and cart
+so: I can always reach them
+pri: Must
+status: Needs Clarification
+qs: Q-75, Q-85
+deps: US-002, US-046
+reqs: FR-NAV-01, FR-NAV-02
+p04: new (FR-NAV-02 from US-01)
+cls: MVP
+sprint: 1
+api: GET /api/v1/storefront/settings; GET /api/v1/me
+ac: Functional | Given any landing, campaign, product, brand or search page, then the header shows the logo, search, "Compte" and "Votre panier" (AC-FR-NAV-01-1).
+ac: Functional | When the member activates the logo, then `/event` opens (AC-FR-NAV-01-2).
+ac: Accessibility | Given keyboard focus at the top of a page, then the skip link "Aller au contenu principal" moves focus to the main content (AC-FR-NAV-01-3).
+ac: Functional | Given any page, then the USP bar shows the configured claims, and a discount claim carries the "*" footnote "Par rapport au prix de vente conseillé" (AC-FR-NAV-02-1).
+ac: Pending | The product name, logo and claim texts are PO content (Q-75, Q-85); no reference branding is used.
+be: None beyond the settings endpoint (US-059)
+fe: `AppShell`, `Header`, `UspBar`, `ToastRegion`, `StorefrontLayout`, `AuthLayout`; React Router route table; store set-up with the RTK Query API slice and the `ui` and `clock` slices
+ft: Skip-link and header tests
+inf: Vite build with content-hashed assets (served per US-060)
+
+@US-044 | E11 | Main navigation by vertical
+role: member
+want: to switch between verticals from the main navigation
+so: I only see the sales relevant to me
+pri: Must
+status: Ready
+deps: US-016
+reqs: FR-NAV-03
+p04: US-02
+cls: MVP
+sprint: 2
+api: GET /api/v1/storefront/navigation
+tables: landings
+ac: Functional | Given a landing page, then the main nav shows the configured verticals in order, each linking to `/event/{id}` (AC-FR-NAV-03-1).
+ac: Functional | Given a campaign, product, brand or search page, then the main nav is not shown (AC-FR-NAV-03-2).
+be: `NavigationController` ordered by `nav_position`
+bt: Test
+fe: `MainNav` in the landing layout only
+ft: Test
+
+@US-045 | E11 | Mega-menu by category
+role: member
+want: to open a category from a vertical's mega-menu
+so: I can shop a product type across sales
+pri: Should
+status: Ready
+deps: US-044, US-013
+reqs: FR-NAV-04
+p04: US-03
+cls: MVP (pulled in)
+sprint: 3
+note: Pulled into the MVP sprints: it is the entry point to category listings (FR-CAT-01, a Must).
+api: GET /api/v1/storefront/navigation
+tables: categories, landings
+ac: Functional | Given a vertical with a mega-menu, when the member hovers its chevron or presses Enter on it, then the panel opens with category columns linking to `/articles/categories/{id}` (AC-FR-NAV-04-1).
+ac: Functional | Given a vertical configured without a mega-menu, then no chevron is shown (AC-FR-NAV-04-2).
+ac: Accessibility | Given keyboard use, then the panel can be opened, navigated and closed with Escape, and focus returns to the chevron (NFR-A11Y-01).
+be: `mega_menu` tree built from `menu_category_id`
+fe: `MegaMenu` using the disclosure pattern
+ft: Keyboard tests
+
+@US-046 | E11 | French price, date and countdown formatting
+role: member
+want: prices, dates and countdowns in correct French formats and on server time
+so: what I read is right
+pri: Must
+status: Ready
+deps: US-059
+reqs: NFR-I18N-03
+p04: US-27
+cls: MVP
+sprint: 0
+ac: Localisation | Given a price of 115 euros (11500 cents), then it renders as "115,00 €"; given a start date, then it renders like "jeu. 5 novembre 06:00" (AC-NFR-I18N-03-1).
+ac: Functional | Given `meta.server_time` in a response, then the client clock offset is updated and every countdown uses `useServerNow()`.
+ac: Functional | Given money from the API, then it is integer cents with currency EUR, and the client never does floating-point money arithmetic.
+be: Response middleware adding `meta.server_time` (delivered with US-059)
+fe: Formatting utilities with `Intl.NumberFormat` and `Intl.DateTimeFormat` for fr-FR; `clock` slice and `useServerNow`
+ft: Formatting unit tests, including the non-breaking spaces that Intl inserts
+
+@US-047 | E11 | Show times in the decided timezone
+role: member
+want: every start and end time shown in one defined timezone
+so: I know exactly when a sale starts
+pri: Must
+status: Blocked
+qs: Q-10
+deps: US-046
+reqs: NFR-TIME-01
+p04: new
+cls: MVP
+sprint: 5
+ac: Functional | Given a campaign starting at 07:00 Paris, then every member sees the start time in the defined timezone (AC-NFR-TIME-01-1), from the `display_timezone` setting; storage stays UTC.
+ac: Pending | The timezone is UNKNOWN (Q-10); production won't start until it is set.
+be: `display_timezone` exposed in the settings (US-059)
+fe: Pass `display_timezone` to every date formatter
+ft: Tests across a daylight-saving change
+
+@US-048 | E11 | Responsive layouts
+role: member
+want: the store to work on my screen size
+so: I can shop on any device
+pri: Must
+status: Blocked
+qs: Q-15
+deps: US-043
+reqs: NFR-RESP-01
+p04: new
+cls: MVP
+sprint: 5
+ac: Pending | Breakpoints and mobile behaviour are to be specified (AC-NFR-RESP-01-1, Q-15). Until then the only check is that layouts follow the mobile-first structure of frontend-architecture §13.
+fe: Layout primitives and per-breakpoint grid columns (frontend-architecture §13); mobile variants once Q-15 is answered
+ft: Visual checks at the decided breakpoints
+
+// ===================== E12 Content & Help Pages =====================
+@US-049 | E12 | Help centre
+role: member
+want: to read help articles by category
+so: I find answers about delivery and returns myself
+pri: Should
+status: Needs Clarification
+qs: Q-49, Q-85
+deps: US-051
+reqs: FR-CNT-02, FR-DLV-01
+p04: US-20
+cls: MVP (pulled in)
+sprint: 5
+note: Pulled into the MVP sprints: FR-DLV-02 (a Must) needs the returns help article to state the same period as the PDP and the terms.
+api: GET /api/v1/help; GET /api/v1/pages/{path}
+tables: help_categories, content_pages
+ac: Functional | Given the help home, then categories list articles at `/help/<category>/<slug>` (AC-FR-CNT-02-1).
+ac: Functional | Given the delivery help category, then each listed topic has an article (AC-FR-DLV-01-1).
+ac: Validation | Given a path that doesn't match `^[a-z0-9/-]+$` or an unpublished page, then 404.
+ac: Security | Given page bodies, then HTML is sanitised on write and rendered without script execution.
+ac: Pending | The texts are PO content (Q-85), and delivery rules in them depend on Q-49.
+be: `HelpController`, `ContentPageController`; HTML sanitiser on write
+bt: Sanitisation tests
+fe: `HelpPages`
+ft: Route tests
+
+@US-050 | E12 | Terms, legal pages and one return period
+role: member
+want: clear terms and one consistent return period everywhere
+so: I know my rights before buying
+pri: Must
+status: Needs Clarification
+qs: Q-48, Q-31
+deps: US-049, US-051
+reqs: FR-CNT-03, FR-DLV-02
+p04: US-20
+cls: MVP
+sprint: 5
+api: GET /api/v1/pages/{path}
+tables: content_pages
+ac: Functional | Given the terms page, then the contracting entity, the contract language and the mediator are stated (AC-FR-CNT-03-1).
+ac: Functional | Given the PDP, the returns help article and the terms, then all three state the same period, taken from `return_period_days` (AC-FR-DLV-02-1, C-03).
+ac: Pending | Entity, language and mediator (Q-48) and the period (Q-31) are PO and Legal decisions; reference texts are never copied.
+be: Render the period from the setting inside page bodies (PROPOSED placeholder mechanism, Architect to confirm) so the text can't drift from the setting
+bt: Consistency test: the PDP, help and terms show the same number
+fe: `ContentPage` for `/terms` and `/legal/:slug`
+ft: Test
+
+@US-051 | E12 | Footer and footnotes
+role: member
+want: a footer that explains every footnote and links to help and legal pages
+so: I understand claims such as "jusqu'à*"
+pri: Should
+status: Ready
+deps: US-043
+reqs: FR-CNT-01, FR-CNT-05
+p04: US-20
+cls: MVP (pulled in)
+sprint: 2
+note: Pulled into the MVP sprints: the "*" footnotes of FR-NAV-02 and FR-CMP-03 (Musts) are defined in the footer, and the consent link (FR-CNT-04) lives there.
+ac: Functional | Given a page with footnote markers, then the footer defines every marker used (AC-FR-CNT-01-1).
+ac: Functional | Given the footer, then app-store badges are shown only when apps exist (AC-FR-CNT-05-1); there are none, so none are shown.
+ac: Functional | Given the footer, then it links to the help, terms and legal pages.
+be: None
+fe: `Footer` with a footnote registry fed by the components that use markers
+ft: Every-marker-defined test
+
+@US-052 | E12 | Cookie consent and privacy
+role: member
+want: to manage my cookie consent
+so: my personal data is only used as I allow
+pri: Must
+status: Needs Clarification
+qs: Q-86
+deps: US-051
+reqs: FR-CNT-04, NFR-PRV-01
+p04: US-21
+cls: MVP
+sprint: 5
+ac: Functional | Given the footer, then a link opens the consent settings (AC-FR-CNT-04-1).
+ac: Privacy | Given a member who refused analytics consent, then no personal attribute (hashed e-mail, name, IDs) is sent to analytics or CRM tools (AC-NFR-PRV-01-1).
+ac: Privacy | Given no consent yet, then no third-party script is loaded (frontend-architecture §15).
+ac: Pending | The consent solution and its purposes are Q-86.
+be: None: no analytics integration is designed
+fe: Consent settings entry point; gate for any third-party script
+ft: No-script-before-consent test
+inf: CSP allows the consent tool's origin only once it is chosen (with US-060)
+
+// ===================== E13 Quality Assurance =====================
+@US-053 | E13 | Concurrency and time-travel test suite
+role: product owner
+want: the stock and lifecycle rules proven by automated tests on MySQL
+so: overselling and wrong sale times can't reach members
+pri: Must
+status: Ready
+deps: US-037, US-039, US-058
+reqs: NFR-CON-01, FR-CMP-05, FR-CRT-02
+p04: new
+cls: MVP
+sprint: 4
+ac: Concurrency | Given N parallel add requests for a size with one unit, then exactly one 201 and N−1 409 `out_of_stock`, and the inventory invariants hold (AC-NFR-CON-01-1).
+ac: Lifecycle | Given request clocks frozen at S−1s, S, E−1s and E, then the campaign state and grid membership match AC-FR-CMP-05-1 and AC-FR-CMP-05-2.
+ac: Timer | Given an item added at T, then `expires_at` equals T + `reservation_minutes` under the chosen timer mode.
+ac: Conditional | If the PO enables FR-CRT-08, then the suite also covers expiry, the sweep racing with remove, and re-adding after expiry before the sweep.
+bt: Parallel-connection harness on MySQL 8, not SQLite
+bt: Helpers that freeze the request clock
+inf: CI job with a MySQL 8 service (US-058)
+
+@US-054 | E13 | Keyboard and screen-reader access to the core journey
+role: member
+want: to complete the core journey with the keyboard and a screen reader
+so: the store is usable for me
+pri: Must
+status: Ready
+deps: US-039
+reqs: NFR-A11Y-01
+p04: US-27
+cls: MVP
+sprint: 5
+ac: Accessibility | Given keyboard-only use, then J1 (browse → PDP → add → cart → remove) can be completed (AC-NFR-A11Y-01-1).
+ac: Accessibility | Given an alert such as "Choisissez une taille", then it is announced (AC-NFR-A11Y-01-2).
+ac: Accessibility | Given every image, then it has alt text; given every dialog, then focus is trapped inside and returned on close.
+ft: End-to-end keyboard test of J1 in a real browser, plus automated accessibility scans of the J1 pages
+fe: Fix the findings
+inf: E2E job in CI
+
+@US-055 | E13 | French-only, correctly pluralised copy
+role: member
+want: the whole store in correct French
+so: nothing confuses me
+pri: Must
+status: Ready
+deps: US-039
+reqs: NFR-I18N-01, NFR-I18N-02
+p04: US-27
+cls: MVP
+sprint: 5
+ac: Localisation | Given any page, then no label is in another language, e.g. no German ARIA labels, and "Max", not "Maks" (AC-NFR-I18N-01-1).
+ac: Localisation | Given N = 1, then "Plus que 1 disponible"; given N > 1, then "Plus que N disponibles" (AC-NFR-I18N-02-1).
+ac: Localisation | Given API messages, then they come from `lang/fr` and are plural-aware.
+be: `lang/fr` messages for every error code and field code
+fe: Every UI string, including ARIA labels, in `messages.fr` (frontend-architecture §14)
+ft: Test that flags UI strings outside `messages.fr`
+
+@US-056 | E13 | Performance targets and load test
+role: product owner
+want: agreed performance targets checked by a load test
+so: launches don't fail under traffic
+pri: Must
+status: Blocked
+qs: Q-42, Q-72
+deps: US-039, US-035
+reqs: NFR-PERF-01
+p04: new
+cls: MVP
+sprint: 5
+ac: Pending | Targets are set by the PO (AC-NFR-PERF-01-1, Q-42). Once set, a load test of the launch journey (landing, listing, add to cart) on a production-like environment meets them.
+bt: Query-plan review of listing, facets and search (indexing-strategy verification plan)
+inf: Load-test tooling and a production-like environment (Q-72, Q-82)
+
+// ===================== E14 Infrastructure & Deployment =====================
+@US-057 | E14 | Local Docker environment
+role: developer
+want: one documented command sequence to start the whole stack locally
+so: everyone works on the same environment
+pri: Must
+status: Ready
+deps:
+reqs: NFR-TECH-01
+p04: new
+cls: MVP
+sprint: 0
+ac: Functional | Given a fresh clone on Windows 11 (WSL2) or Linux, when the developer follows docker-architecture §7, then nginx, app, scheduler, queue, mysql and vite start and the SPA loads on `http://localhost:8080`.
+ac: Functional | Given the stack, then `/api/*`, `/sanctum/*` and `/up` reach Laravel through Nginx on the same origin.
+ac: Health | Given each service, then its health check from docker-architecture §6 passes.
+ac: Optional | Given the `redis` or `mail` profile, then Redis or Mailpit starts; without them the database drivers are used.
+ac: Scope | Nothing for checkout or payment is included.
+inf: Compose file; Dockerfiles for `app` (PHP 8.3+ FPM with pdo_mysql, intl, bcmath, opcache) and `vite`; Nginx config; volumes; `.env.example` with labelled development placeholders
+inf: `.gitattributes` with `eol=lf` (docker-architecture §8)
+bt: Smoke test on `/up`
+
+@US-058 | E14 | Continuous integration
+role: developer
+want: every change checked automatically before it is merged
+so: regressions and forbidden dependencies are caught early
+pri: Must
+status: Needs Clarification
+qs: Q-82
+deps: US-057
+reqs: NFR-TECH-01
+p04: new
+cls: MVP
+sprint: 0
+ac: Functional | Given a pull request, then CI runs the PHP and JS linters, the back-end tests on MySQL 8, the front-end tests and the SPA build, and blocks the merge on failure.
+ac: Functional | Given the module dependency rules (backend-architecture §2), then an architecture test fails the build on a forbidden dependency.
+ac: Functional | Given the documentation, then the Phase 05 design-validation checks and the Phase 06 backlog checks (`tools/phase06/gen.py`) run as scripts.
+ac: Pending | The Git host and CI platform are Q-82.
+inf: CI workflow with a MySQL 8 service; Composer and npm caches
+inf: Re-script the Phase 05 design-validation checks, whose original scripts weren't kept
+bt: Architecture tests for the namespace rules
+
+@US-059 | E14 | API foundation
+role: developer
+want: one versioned API base with a uniform error format, request IDs, server time and fail-closed settings
+so: every endpoint is built the same way
+pri: Must
+status: Ready
+deps: US-057
+reqs: NFR-OBS-01, NFR-TECH-01
+p04: new
+cls: MVP
+sprint: 0
+api: GET /api/v1/storefront/settings
+ac: Functional | Given any error, then the body is `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`, `code` and `request_id`, and never a stack trace or SQL (error-format §1).
+ac: Observability | Given a failed API call, then it can be correlated with a server log entry by request ID, echoed in `X-Request-Id` (AC-NFR-OBS-01-1).
+ac: Functional | Given any success response, then `meta.server_time` is present in UTC.
+ac: Functional | Given production with an unset policy value, then boot fails or `GET /storefront/settings` answers 503 `settings_incomplete`; no silent default is used.
+ac: Validation | Given an unknown query parameter on any endpoint, then 422 `validation_failed`.
+be: `/api/v1` route groups by auth code; exception renderer covering the error-format catalogue; request-ID and server-time middleware; `config/storefront.php` and `StorefrontSettings` with the production boot check
+bt: Renderer tests for every catalogue code
+inf: Env variable categories (docker-architecture §5)
+
+@US-060 | E14 | Transport security and caching headers
+role: member
+want: my session and data protected in transit and in the browser cache
+so: nobody else can read or reuse them
+pri: Must
+status: Ready
+deps: US-057
+reqs: NFR-SEC-03, NFR-SEC-04, NFR-CACHE-01
+p04: new
+cls: MVP
+sprint: 0
+ac: Security | Given any response, then HSTS is present; given HTML, then framing is restricted and a CSP is sent (AC-NFR-SEC-04-1). HSTS is checked in the production-like mode, not on local HTTP.
+ac: Security | Given a cart or account response, then it carries `Cache-Control: no-store` (AC-NFR-SEC-03-1).
+ac: Caching | Given a built asset, then its file name contains a content hash and it is served with a one-year immutable cache (AC-NFR-CACHE-01-1).
+be: `no-store` middleware on S endpoints and on availability reads
+bt: Header tests per route group
+inf: Nginx security headers per authentication-design §7; asset cache rules
+
+@US-061 | E14 | MySQL behaviour spike
+role: development team
+want: the three unverified MySQL behaviours checked before the schema is frozen
+so: migrations neither fail nor silently differ from the design
+pri: Must
+status: Ready
+deps: US-057
+reqs: NFR-CON-01, NFR-TECH-01
+p04: new
+cls: MVP
+sprint: 0
+ac: Spike | Given the MySQL 8 version chosen for production, then the team records whether CHECK constraints are accepted on tables whose columns also carry FK referential actions, and adjusts the affected constraints.
+ac: Spike | Given the generated columns that subtract unsigned values (`quantity_available`, `discount_percent`), then the behaviour at the boundaries (zero, reserved + sold = allocated, a rejected over-reserve) is recorded, and the design is adjusted if an intermediate negative value raises a different error than designed.
+ac: Spike | Given the composite FKs through `product_id`, then they are created and enforced as designed.
+ac: Outcome | Given any difference, then it is recorded as an erratum to schema.md and approved by the architect before US-012 and US-015 freeze their migrations.
+bt: Throwaway migration experiments, not merged
+inf: MySQL 8 version pinned in Docker and CI
+
+// ===================== E15 Recommendations =====================
+@US-062 | E15 | Recommendation rails on the default landing
+role: member
+want: recommendations on the default landing
+so: I discover relevant products
+pri: Should
+status: Needs Clarification
+qs: Q-29
+deps: US-016, US-023
+reqs: FR-REC-01
+p04: US-16
+cls: Post-MVP
+sprint: 7
+api: GET /api/v1/recommendations/{rail}; GET /api/v1/articles
+ac: Functional | Given `/event`, then the personal rails are requested; given a vertical landing, then neither rail is shown (AC-FR-REC-01-2).
+ac: Functional | Given a rail with items, then it is shown and "Voir tout" opens `/campaigns/top-picks/articles` (AC-FR-REC-01-1).
+ac: Functional | Given an empty rail (the v1 `ForYou` and `ContinueShopping` bindings), then the UI hides it.
+ac: Pending | The logic is UNKNOWN (Q-29); AC-FR-REC-01-1 ("both rails are shown") can't pass until a provider returns items.
+be: `RecommendationProvider` interface with empty v1 bindings; `RecommendationController`; `collection=top-picks` context
+bt: Tests
+fe: `RecommendationRail`; `TopPicksListingPage` route declared before `:campaignId`
+ft: Hidden-when-empty test
+
+@US-063 | E15 | Popular rail
+role: member
+want: a rail of popular live articles on landings
+so: I see what others are reserving
+pri: Should
+status: Needs Clarification
+qs: Q-78, Q-29
+deps: US-062, US-037
+reqs: FR-REC-02
+p04: US-16
+cls: Post-MVP
+sprint: 7
+api: GET /api/v1/recommendations/{rail}
+tables: article_reservation_stats
+ac: Functional | Given a landing with the popular rail and at least 12 qualifying articles, then the rail shows 12 live product tiles linking to article URLs (AC-FR-REC-02-1).
+ac: Functional | Given reservations in the last 24 hours, then the PROPOSED v1 strategy ranks articles by reservation count, with no regional dimension (Q-78).
+ac: Functional | Given stats older than 7 days, then the daily prune removes them.
+be: Queued `IncrementArticleReservationStats` listener; `Popular` strategy; `recommendations:prune-stats`
+bt: Ranking and prune tests
+fe: Rail on landings with `popular_rail = true`
+inf: `queue` and `scheduler` services
+
+// ===================== E16 Data Administration =====================
+@US-064 | E16 | Synthetic seed data
+role: development team
+want: realistic synthetic data in every campaign state
+so: features can be built, tested and demonstrated without real or reference data
+pri: Must
+status: Ready
+deps: US-012, US-015
+reqs: FR-EVT-01, FR-CMP-09, FR-CAT-01
+p04: new
+cls: MVP
+sprint: 2
+note: Enabler (C-16, docker-architecture §7). It adds no business rule.
+ac: Data | Given `php artisan migrate --seed`, then brands, categories, size systems, products, landings, campaigns (upcoming, live and ended), campaign articles and stock exist.
+ac: Data | Given the seed data, then no brand name, image, text or identifier comes from the reference platform.
+ac: Data | Given the seed data, then at least one listing has more than 60 articles (FR-CAT-09) and at least one size has exactly one unit (for the NFR-CON-01 tests).
+ac: Data | Given placeholder content for UNKNOWN values (reasons, legal texts), then it is visibly labelled as a placeholder.
+be: Factories and per-module seeders; campaign windows relative to the seeding time, so states stay valid on any date
+bt: Seeder smoke test
+inf: Seed step in the local workflow and in CI
+
+@US-065 | E16 | Production data entry
+role: product owner
+want: a way to load real brands, products, campaigns and stock
+so: the store can open with real sales
+pri: Must
+status: Blocked
+qs: Q-50, Q-80
+deps: US-012, US-015
+reqs: FR-CMP-05, FR-CMP-09
+p04: US-23, US-24 (HYPOTHESIS merchandiser persona)
+cls: MVP
+sprint: B
+note: Release gate for any launch with real products. No back-office, import format or admin UI is designed (C-16). If Q-80 makes the MVP an internal demo, seed data (US-064) is enough.
+ac: Pending | No acceptance criteria can be written until Q-50 says who enters which data, how (back-office, import file or API) and with which roles; `merchandiser` and `admin` are HYPOTHESIS roles.

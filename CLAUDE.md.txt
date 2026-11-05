@@ -1,0 +1,38 @@
+# Project: Flash Sale Platform Analysis
+
+## Objective
+Analyze the authorized scope of the reference platform and produce a complete functional and technical specification for building an independent Flash Sale E-commerce platform.
+
+## Target Technology
+- Laravel 13
+- PHP 8.3+
+- React 19
+- MySQL
+- REST API
+- Docker
+
+## Analysis Method
+Scoped Black-Box Reverse Engineering.
+
+## Rules
+1. Analyze only explicitly authorized pages, accounts, resources and systems.
+2. Never assume access to resources outside the approved scope.
+3. Do not modify the reference platform.
+4. Do not perform purchases or financial transactions.
+5. Do not collect personal customer information or credentials.
+6. Do not expose authentication tokens or session cookies in reports.
+7. Distinguish CONFIRMED, HYPOTHESIS and UNKNOWN.
+8. Provide evidence for technical conclusions.
+9. Do not implement the application during analysis.
+
+## Expected Deliverables
+- Product Requirements Document
+- Software Requirements Specification
+- Sitemap
+- Feature Inventory
+- User Stories
+- Business Rules
+- User Journey Diagrams
+- Database ERD
+- API Specification
+- Technical Architecture

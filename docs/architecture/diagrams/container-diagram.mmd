@@ -1,0 +1,24 @@
+%% Container diagram (Phase 05, PROPOSED). One origin: Nginx serves the SPA and proxies /api.
+flowchart LR
+  browser["Browser<br/>React 19 SPA (Vite build, Tailwind, RTK Query)"]
+  subgraph platform["Application platform (Docker)"]
+    nginx["Nginx<br/>TLS, static SPA assets, /api → PHP-FPM,<br/>security headers"]
+    api["Laravel API (PHP-FPM)<br/>REST /api/v1, Sanctum SPA session auth"]
+    scheduler["Scheduler (same image)<br/>runs scheduled commands every minute"]
+    worker["Queue worker (same image)<br/>async listeners and jobs"]
+    db[("MySQL 8<br/>catalogue, campaigns, inventory,<br/>reservations, accounts, content")]
+    cache[("Redis — PROPOSED, optional<br/>sessions, cache, queue, locks<br/>(fallback: database drivers)")]
+  end
+  checkout["Checkout service / module<br/>OUT OF SCOPE"]
+  mail["E-mail provider"]
+
+  browser -->|HTTPS, same origin| nginx
+  nginx -->|FastCGI| api
+  api --> db
+  api --> cache
+  scheduler --> db
+  scheduler --> cache
+  worker --> db
+  worker --> cache
+  worker --> mail
+  api -.->|cart hand-off contract TBD| checkout

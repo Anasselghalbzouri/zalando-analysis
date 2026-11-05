@@ -1,0 +1,178 @@
+# Local development stack (docs/architecture/docker-architecture.md, docs/phase-07/03-docker-architecture.md).
+# Start: copy .env.example to .env, then `docker compose up -d --build`.
+# Optional profiles: `--profile redis`, `--profile mail`. Nothing here is for production or for checkout (M21).
+name: storefront-dev
+
+x-php: &php
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+    args:
+      UID: ${UID:-1000}
+      GID: ${GID:-1000}
+  image: storefront-dev/php:local
+  restart: unless-stopped
+  environment: &db-env
+    # Container variables take precedence over backend/.env.
+    DB_CONNECTION: mysql
+    DB_HOST: mysql
+    DB_PORT: 3306
+    DB_DATABASE: ${MYSQL_DATABASE:?set MYSQL_DATABASE in .env}
+    DB_USERNAME: ${MYSQL_USER:?set MYSQL_USER in .env}
+    DB_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+  volumes:
+    - ./backend:/var/www/html
+    - vendor:/var/www/html/vendor
+  networks: [app]
+
+services:
+  nginx:
+    image: nginx:1.30-alpine
+    restart: unless-stopped
+    environment:
+      NGINX_SPA_MODE: ${NGINX_SPA_MODE:-vite}
+    ports:
+      - "127.0.0.1:${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./docker/nginx/templates:/etc/nginx/templates:ro
+      - ./docker/nginx/snippets:/etc/nginx/snippets:ro
+      - ./backend/public:/var/www/html/public:ro
+      - ./frontend/dist:/usr/share/nginx/spa:ro
+    depends_on:
+      app:
+        condition: service_healthy
+      vite:
+        condition: service_healthy
+    healthcheck:
+      # nginx -> app -> database, through the framework health route.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/up || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks: [app]
+
+  app:
+    <<: *php
+    environment:
+      <<: *db-env
+      # Only this service runs composer install / creates backend/.env on first start.
+      APP_BOOTSTRAP: "true"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "test -f vendor/autoload.php && SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      # The first start runs composer install.
+      start_period: 300s
+
+  scheduler:
+    <<: *php
+    command: ["php", "artisan", "schedule:work"]
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      # Heartbeat written every minute by routes/console.php.
+      test: ["CMD-SHELL", "find storage/framework/scheduler-heartbeat -mmin -3 | grep -q ."]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
+  queue:
+    <<: *php
+    command: ["php", "artisan", "queue:work", "--tries=3", "--max-time=3600"]
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'queue:work' > /dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?set MYSQL_DATABASE in .env}
+      MYSQL_USER: ${MYSQL_USER:?set MYSQL_USER in .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    ports:
+      # Optional, for local database tools; bound to localhost only.
+      - "127.0.0.1:${MYSQL_FORWARD_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      # TCP ping: fails during the first-run initialisation, which runs without networking.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [app]
+
+  vite:
+    build:
+      context: .
+      dockerfile: docker/node/Dockerfile
+    image: storefront-dev/node:local
+    restart: unless-stopped
+    environment:
+      # The browser reaches HMR through Nginx on the published port.
+      VITE_HMR_CLIENT_PORT: ${NGINX_PORT:-8080}
+      # Needed for file watching when the repository is on a Windows drive (docker-architecture §8).
+      VITE_USE_POLLING: ${VITE_USE_POLLING:-true}
+    volumes:
+      - ./frontend:/app
+      - node_modules:/app/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:5173/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # The first start runs npm ci.
+      start_period: 300s
+    networks: [app]
+
+  redis:
+    image: redis:8-alpine
+    profiles: [redis]
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks: [app]
+
+  mailpit:
+    image: axllent/mailpit:latest
+    profiles: [mail]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
+    networks: [app]
+
+volumes:
+  mysql-data:
+  vendor:
+  node_modules:
+  redis-data:
+
+networks:
+  app:

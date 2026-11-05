@@ -1,0 +1,18 @@
+# LF everywhere: CRLF breaks shell entrypoints and configs inside the Linux containers
+# (docker-architecture §8). This overrides a system-wide core.autocrlf=true.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary

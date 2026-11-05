@@ -1,0 +1,25 @@
+%% Component diagram of the Laravel API (Phase 05, PROPOSED). Arrows = "depends on".
+flowchart TB
+  http["HTTP layer (per module)<br/>routes, controllers, form requests,<br/>API resources, policies"]
+  identity["Identity<br/>login, registration, session, password reset"]
+  account["Account<br/>profile, newsletter preferences, saved sizes"]
+  catalog["Catalog<br/>brands, categories, products, variants,<br/>images, attributes, size systems"]
+  sales["Sales (Merchandising)<br/>landings, campaigns, campaign articles,<br/>heroes, lifecycle"]
+  inventory["Inventory<br/>stock per campaign article and size,<br/>atomic reserve / release"]
+  cart["Cart<br/>reservations, timer, expiry"]
+  listing["Listing & Search<br/>filters, facets, sort, full-text, suggestions"]
+  reco["Recommendations<br/>provider interface (logic UNKNOWN, Q-29)"]
+  content["Content<br/>help categories, help and legal pages"]
+  config["Storefront settings<br/>policy values (PO decisions)"]
+
+  http --> identity & account & catalog & sales & cart & listing & reco & content & config
+  sales --> catalog
+  inventory --> sales
+  cart --> inventory
+  cart --> sales
+  listing --> sales
+  listing --> catalog
+  listing --> inventory
+  reco --> listing
+  account --> identity
+  account --> catalog
