@@ -92,7 +92,8 @@ Phase 0 of the plan. Each decision resolves one open point from the Technical Co
 ## R-06 Server time and the request clock
 
 - **Decision:**
-  - **`App\Support\RequestClock`:** bound as a scoped singleton. It captures `CarbonImmutable::now('UTC')` once, the first time it is used in a request.
+  - **`App\Support\RequestClock`:** a static `now(?Request $request = null): CarbonImmutable` method. It stores `CarbonImmutable::now('UTC')` in the request attribute `request_now` the first time it is called, and returns that value on every later call in the same request.
+  - **Why not a scoped singleton:** checked in 13.40, the HTTP kernel never calls `forgetScopedInstances()` (only Octane and queue workers do). So a scoped clock would keep one instant across several requests in the same test or process.
   - **`AddServerTime` middleware** on the `api` group: for a 2xx `JsonResponse` whose payload is an object, it sets `meta.server_time` to `RequestClock::now()->toIso8601ZuluString()` (second precision, `Z`). Other responses are untouched.
 - **Rationale:** ADR-009 asks for one "now" per request. US-015 (T-015-B2) and US-053 reuse the same clock instead of adding a second one. `travelTo()` in tests freezes it.
 - **Alternatives considered:**
