@@ -113,6 +113,7 @@ These were raised while building [the Phase 06 backlog](../phase-06/09-open-ques
 | Q-84 | How to enforce root-category slug uniqueness, given MySQL treats NULL parents as distinct in UQ (parent_id, slug)? A Phase 05 schema erratum | US-012 | Architect |
 | Q-85 | Who writes and supplies MVP content (help, USP claims, footnotes, images), and in what format? | US-043, US-049 | PO / Content |
 | Q-86 | Which cookie-consent solution and which consent purposes? | US-052 (FR-CNT-04) | PO / DPO |
+| Q-87 | Which `code` do `/api/v1` HTTP errors outside the error-format catalogue use (405 wrong method, 413 body too large, 415 wrong media type)? The catalogue has no entry, so AC-1 of US-059 can't be met for them. Raised in Phase 08 | US-059 (error-format §2 erratum) | Architect |
 
 ## D. Known defects observed (don't replicate)
 - German ARIA labels in the French search (M08).
