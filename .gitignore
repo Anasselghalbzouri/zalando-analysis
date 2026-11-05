@@ -25,3 +25,6 @@ evidence/
 *.stackdump
 .DS_Store
 Thumbs.db
+
+# Python bytecode (Spec Kit and tools scripts)
+__pycache__/

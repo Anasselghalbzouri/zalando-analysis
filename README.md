@@ -10,7 +10,8 @@ An independent e-commerce web application: a Laravel 13 REST API and a React 19 
 | Requirements | [docs/requirements/](docs/requirements/SRS.md) |
 | Architecture | [docs/architecture/](docs/architecture/system-overview.md) |
 | Backlog and sprints | [docs/phase-06/](docs/phase-06/03-product-backlog.md) |
-| Environment (this phase) | [docs/phase-07/](docs/phase-07/06-phase-07-summary.md) |
+| Environment | [docs/phase-07/](docs/phase-07/06-phase-07-summary.md) |
+| Development with Spec Kit (Phase 08) | [docs/phase-08/00-spec-kit-workflow.md](docs/phase-08/00-spec-kit-workflow.md) |
 
 ## Prerequisites
 - **Windows 11** with **Docker Desktop** (WSL 2 backend), **Git** and **VS Code**. macOS and Linux with Docker Engine and Compose v2 should work too, but haven't been tested.
@@ -76,7 +77,7 @@ python -I tools/phase06/gen.py .                   # regenerate and check the Ph
 - **Back to development:** set `NGINX_SPA_MODE=vite` and run the same command.
 
 ## Conventions
-- **Branches:** `feature/US-0xx-short-name`, after a Phase 06 story. Merge by pull request once the [Definition of Done](docs/phase-06/07-definition-of-done.md) is met.
+- **Branches:** `feature/NNN-us-0xx-short-name`, one per Phase 06 story, created by Spec Kit (`/speckit-specify`, see [docs/phase-08/00-spec-kit-workflow.md](docs/phase-08/00-spec-kit-workflow.md)). Merge by pull request once the [Definition of Done](docs/phase-06/07-definition-of-done.md) is met.
 - **Commits:** imperative subject naming the story, e.g. `US-059: add problem+json renderer`.
 - **Line endings:** LF (`.gitattributes`). Shell scripts with CRLF break inside the containers.
 - **Secrets:** only `*.env.example` files with placeholders are committed.

@@ -51,7 +51,7 @@ The SPA has two routes only:
 The API has no endpoint. Its route files carry a comment pointing to api-contracts.md. No model, controller, business migration, product, campaign, cart or checkout page was created.
 
 ## Development conventions (initial)
-- **Branches:** `main` is protected by convention. Work happens on `feature/US-0xx-short-name` branches named after the Phase 06 story, and merges by pull request once the Definition of Done ([07-definition-of-done.md](../phase-06/07-definition-of-done.md)) is met.
+- **Branches:** `main` is protected by convention. Work happens on `feature/NNN-us-0xx-short-name` branches, one per Phase 06 story, created by Spec Kit (Phase 08), and merges by pull request once the Definition of Done ([07-definition-of-done.md](../phase-06/07-definition-of-done.md)) is met.
 - **Commits:** imperative subject that names the story, e.g. `US-059: add problem+json renderer`. One logical change per commit.
 - **Line endings:** LF everywhere (`.gitattributes`). Don't change `core.autocrlf` back to `true` for this repository.
 - **Tools run in containers:** `docker compose exec app …` for PHP, `docker compose exec vite …` for Node. Host PHP and Node versions don't matter.
