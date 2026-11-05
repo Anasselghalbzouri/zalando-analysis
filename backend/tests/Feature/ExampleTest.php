@@ -22,6 +22,7 @@ class ExampleTest extends TestCase
     {
         $this->get('/api/v1/unknown-route')
             ->assertNotFound()
-            ->assertHeader('Content-Type', 'application/json');
+            ->assertHeader('Content-Type', 'application/problem+json') // US-059: error-format.md
+            ->assertJsonPath('code', 'not_found');
     }
 }

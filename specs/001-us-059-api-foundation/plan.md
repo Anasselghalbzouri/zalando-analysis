@@ -87,7 +87,7 @@ backend/
 │   └── providers.php                   # MODIFY: + StorefrontServiceProvider
 ├── app/
 │   ├── Support/
-│   │   ├── RequestClock.php            # scoped "now" (ADR-009)
+│   │   ├── RequestClock.php            # per-request "now" (request attribute, ADR-009)
 │   │   ├── Problems/
 │   │   │   ├── Catalogue.php           # code → status (20 codes)
 │   │   │   ├── ApiProblem.php          # exception carrying code, detail, errors, headers

@@ -76,12 +76,12 @@ git status ; git check-ignore ; secret scan of the files Git would add
 | # | Issue | Impact | Next step |
 |---|---|---|---|
 | K-1 | **Repository location:** it is on `C:\`, not in the WSL filesystem | Slower bind mounts; Vite needs polling | Move it into WSL (docker-architecture §8). Your decision |
-| K-2 | **Debug output:** with `APP_DEBUG=true`, API errors include stack traces | Local only | The problem+json renderer (US-059) hides internals |
+| K-2 | **Debug output:** with `APP_DEBUG=true`, API errors include stack traces | Local only | **Resolved by US-059:** the problem+json renderer hides internals |
 | K-3 | **Default `users` migration:** the skeleton's migration ran, creating `users`, `password_reset_tokens` and `sessions` | The `users` shape differs from schema.md | US-001 replaces it. The dev database is disposable: `migrate:fresh` |
 | K-4 | **Queue on first start:** `queue` restarts until `php artisan migrate` has run | First start only | Documented in the README |
 | K-5 | **Test database:** tests use in-memory SQLite, not MySQL | The Phase 06 DoD wants MySQL wherever constraints or concurrency matter | A MySQL test database with CI (US-058, US-053) |
 | K-6 | **Auth and headers not set up:** Sanctum isn't installed; no HSTS, CSP or frame headers yet | `/sanctum` is routed but serves nothing | US-002 (auth) and US-060 (headers) |
-| K-7 | **Policy settings:** `config/storefront.php`, the policy values and the feature switches don't exist yet | None until features read them | US-059 |
+| K-7 | **Policy settings:** `config/storefront.php`, the policy values and the feature switches don't exist yet | None until features read them | **Resolved by US-059** |
 | K-8 | **Root-run images:** `nginx` (master process) and `mailpit` run as root | Local development only | The unprivileged nginx image is an option for production (docker-architecture §9) |
 | K-9 | **Unpinned image:** `axllent/mailpit:latest` | Optional dev tool; may change | Pin a version when CI exists |
 | K-10 | **Tooling not set up:** no ESLint, Prettier, Pint, Vitest or Playwright configuration yet | — | US-058 (CI) and the testing tasks |

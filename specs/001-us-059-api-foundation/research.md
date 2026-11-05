@@ -15,7 +15,7 @@ Phase 0 of the plan. Each decision resolves one open point from the Technical Co
 - **Alternatives considered:**
   - 503 from the endpoint only: smaller, but deviates from backend §12 without an erratum.
   - A startup failure that crashes the process: gives no problem body, which breaks AC-1.
-- **Verify:** that a provider `boot()` exception reaches the registered render callback, with the translator and `app.url` available. Covered by a quickstart scenario.
+- **Verified 2026-11-05 (quickstart scenario 9):** with `APP_ENV=production` and `STOREFRONT_RESERVATION_MINUTES` unset, the API answered the 503 `settings_incomplete` problem body with its request ID, `/up` answered a plain 503 HTML page without a trace, `artisan about` exited with 1, and the log named `reservation_minutes`.
 
 ## R-02 One renderer and one catalogue
 
@@ -115,7 +115,7 @@ Phase 0 of the plan. Each decision resolves one open point from the Technical Co
   - **Module routes:** `routes/api.php` includes `app/Modules/*/routes.php`. The Storefront module puts the settings route in `access.public`.
 - **Rationale:** later stories only fill a group; no route needs to move. No authentication package is installed here (spec, Out of scope).
 - **Alternatives considered:** prefixes or route-name conventions: harder to check in a route-list test than a middleware-group name.
-- **Verify:** that an empty middleware group is accepted by the router.
+- **Verified:** empty middleware groups are accepted (`route:list` shows `api`, `access.public`).
 
 ## R-09 Policy configuration
 

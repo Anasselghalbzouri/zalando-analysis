@@ -48,7 +48,7 @@ The MySQL passwords are applied only when the `mysql-data` volume is first creat
 | Redis | `REDIS_HOST=redis`, `REDIS_CLIENT=phpredis` | Optional |
 | Mail | `MAIL_MAILER=log` | For Mailpit: `smtp`, `mailpit`, `1025` |
 
-**Not configured yet:** the storefront policy values and feature switches (`STOREFRONT_*`, `FEATURE_*`, system-overview §7). They belong to `config/storefront.php` in US-059. Each one is a PO decision with a Q-ID and must not get a silent default.
+**Storefront policy (US-059):** `config/storefront.php` reads the `STOREFRONT_*` values and the switches `FEATURE_HIDE_ADD_BUTTON_AFTER_ADD` and `FEATURE_LAST_HOURS_BADGE` (system-overview §7). Each value is a PO decision with a Q-ID and has no default; `backend/.env.example` holds labelled development placeholders. An unset or invalid value answers 503 `settings_incomplete`, and production refuses to start. The backend-only switches come with the stories that read them.
 
 ## 4. CORS and same origin
 - **Single origin:** the SPA and the API share `http://localhost:8080` (ADR-003).
