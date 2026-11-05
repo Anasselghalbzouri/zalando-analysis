@@ -42,10 +42,15 @@
 | 422 | `validation_failed` | Form Request failure, with field `errors` | Map to fields; focus the first |
 | 422 | `invalid_credentials` | Login failure | Form-level message |
 | 422 | `invalid_token` | Password-reset token invalid or expired | Form-level message |
+| 405 | `method_not_allowed` | Wrong HTTP method on a known route; the response carries `Allow` (erratum E-01) | Generic error toast |
+| 413 | `payload_too_large` | Request body above the server limit (erratum E-01) | Generic error toast |
+| 415 | `unsupported_media_type` | Body media type not accepted, e.g. not JSON (erratum E-01) | Generic error toast |
 | 429 | `rate_limited` | Throttled | Wait for `Retry-After` |
 | 503 | `settings_incomplete` | A production policy value is unset (fail closed) | Maintenance message |
 | 503 | `service_unavailable` | Maintenance or a dependency is down | Maintenance message |
 | 500 | `server_error` | Unhandled | Error boundary, showing the request ID |
+
+**Erratum E-01 (2026-11-05, Q-87, approved by the user in Phase 08 for US-059):** the 405, 413 and 415 rows were added. The catalogue had no code for these HTTP errors, so AC-1 of US-059 ("any error" carries a `code`) couldn't be met for them.
 
 ## 3. Field error codes (inside `errors`)
 | Field code | Typical field | French message |

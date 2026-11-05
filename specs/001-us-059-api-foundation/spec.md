@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-05
 
-**Status**: Draft
+**Status**: Draft (clarified)
 
 **Input**: User description: "US-059 API foundation. Implement exactly the story in docs/phase-06/04-user-stories.md#us-059 (NFR-OBS-01, NFR-TECH-01): /api/v1 route groups by auth code, the problem+json renderer covering the error-format.md catalogue, request ID and server time middleware, config/storefront.php and GET /api/v1/storefront/settings that fails closed in production. Policy values are PO decisions: no silent defaults (system-overview §7)."
 
@@ -21,6 +21,12 @@
 | Risk | R-15 (policy settings unset: production fails closed) |
 
 The actors are **API client developers**, who build the SPA and every later endpoint against this base, the **SPA** itself, and the **operator**, who deploys and reads the logs.
+
+## Clarifications
+
+### Session 2026-11-05
+
+- Q: Which `code` do `/api/v1` HTTP errors outside the catalogue use (405, 413, 415)? (Q-87) → A: Add three catalogue codes: 405 `method_not_allowed` with `Allow`, 413 `payload_too_large`, 415 `unsupported_media_type`. Recorded as error-format §2 erratum E-01.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -81,11 +87,11 @@ Every successful `/api/v1` JSON response carries `meta.server_time`, so countdow
 - **Unknown path under `/api/v1`**: 404 `not_found` problem body, with `request_id`.
 - **Malformed JSON body**: 400 `bad_request`.
 - **Maintenance mode**: 503 `service_unavailable`, not `settings_incomplete`.
-- **Wrong HTTP method on a known route, oversized body, wrong media type**: these aren't in the catalogue (FR-012).
+- **Wrong HTTP method on a known route, oversized body, wrong media type**: 405 `method_not_allowed` (with `Allow`), 413 `payload_too_large`, 415 `unsupported_media_type` (FR-012).
 - **Invalid policy value** (non-numeric number, `catalog_access` not `members`/`public`, `reservation_timer_mode` not `per_item`/`shared`, timezone not an IANA name): treated like an unset value.
 - **Query keys with brackets** (`page[number]`): reported under the request's own bracket path in `errors`, e.g. `page.number` (error-format §1 rule 4).
 - **Responses with no body** (204): there is no envelope, so no `meta.server_time`. The request ID header is still present.
-- **Routes outside `/api/v1`** (the SPA shell, the health route): not changed by this feature.
+- **Routes outside `/api/v1`** (the SPA shell, the health route): unchanged, except that in production with incomplete settings they answer a plain 503 page (no debug output), so the health check fails (research R-01).
 
 ## Requirements *(mandatory)*
 
@@ -113,7 +119,7 @@ Every successful `/api/v1` JSON response carries `meta.server_time`, so countdow
 
 - **FR-010**: Every `/api/v1` response, success or error, MUST carry an `X-Request-Id` header. The system MUST reuse the inbound `X-Request-Id` when it is well formed (1–128 characters from letters, digits, `.`, `_` and `-`). Otherwise it MUST generate a new unique identifier (backend-architecture §15).
 - **FR-011**: The request ID MUST be attached to every server log entry written while the request is handled. Each error response MUST produce one log entry with the request ID, status, `code` and path. A 500 entry MUST also hold the exception details. Log entries MUST NOT contain passwords, session IDs, CSRF tokens, query strings or request bodies (story AC-2, backend-architecture §15, NFR-PRV-01).
-- **FR-012**: HTTP errors under `/api/v1` that have no catalogue entry (405 wrong method, 413 body too large, 415 wrong media type) MUST be answered with [NEEDS CLARIFICATION: Q-87, which `code` and status these errors use; the error-format §2 catalogue has none].
+- **FR-012**: HTTP errors under `/api/v1` that have no catalogue entry (405 wrong method, 413 body too large, 415 wrong media type) MUST keep their real status and use the catalogue codes added for them: 405 `method_not_allowed`, with an `Allow` header listing the route's methods; 413 `payload_too_large`; 415 `unsupported_media_type` (Q-87, answered 2026-11-05: option A; error-format §2 erratum E-01).
 
 **Server time**
 
@@ -161,8 +167,8 @@ US-059 makes each value configurable and fails closed without it. It does **not*
 
 ### Recorded tensions (for the plan, not resolved here)
 
-- **`last_hours_badge_threshold_hours`**: the api-contracts §3 shape types it `int | null`, but R-15 and the Phase 06 summary (G-05) count it among the required values. This spec doesn't pick a side. The plan takes it up under Q-36, and until then it counts as required in production.
-- **Story AC-4 says "boot fails *or*" 503**: if startup fails, no 503 body is ever served. The plan picks one behaviour and records why. FR-018 accepts either.
+- **`last_hours_badge_threshold_hours`**: the api-contracts §3 shape types it `int | null`, but R-15 and the Phase 06 summary (G-05) count it among the required values. This spec doesn't pick a side. Plan decision: research R-09 treats it as required (the fail-closed reading) while Q-36 stays open.
+- **Story AC-4 says "boot fails *or*" 503**: if startup fails, no 503 body is ever served. Plan decision: research R-01 does both. Production startup fails, and the failure is rendered as the 503 `settings_incomplete` problem body on `/api/v1`.
 
 ## Out of scope
 
