@@ -19,7 +19,7 @@
 
 - **Sprint goal:** A running local stack, CI on MySQL 8, the API foundation and security headers; the MySQL spike done; the Sprint 0 decision workshop held.
 - **Decision gate:** Before Sprint 1 planning: Q-70 (product granularity), Q-71 (catalogue access), Q-40 (login methods), Q-80 (MVP release purpose), Q-81 (capacity), Q-82 (CI platform), Q-84 (root slug fix)
-- **User stories:** US-046 French price, date and countdown formatting (Must, Ready); US-057 Local Docker environment (Must, Ready); US-058 Continuous integration (Must, Needs Clarification); US-059 API foundation (Must, Ready); US-060 Transport security and caching headers (Must, Ready); US-061 MySQL behaviour spike (Must, Ready)
+- **User stories:** US-046 French price, date and countdown formatting (Must, Ready); US-057 Local Docker environment (Must, Ready); US-058 Continuous integration (Must, Needs Clarification); US-059 API foundation (Must, Done); US-060 Transport security and caching headers (Must, Ready); US-061 MySQL behaviour spike (Must, Ready)
 - **Backend tasks:** T-046-B1, T-059-B1, T-060-B1
 - **Frontend tasks:** T-046-F1
 - **Testing tasks:** T-046-FT1, T-057-BT1, T-058-BT1, T-059-BT1, T-060-BT1, T-061-BT1

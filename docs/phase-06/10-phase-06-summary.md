@@ -34,7 +34,7 @@
 | 10 | Every API reference is one of the endpoints in api-contracts.md | **Pass** |
 | 11 | Every table reference exists in schema.md (domain or framework tables) | **Pass** |
 | 12 | No story touches checkout, payment or order endpoints or tables (M21 stays excluded) | **Pass** |
-| 13 | Every Q-ID cited exists in open-questions.md or is a new Phase 06 question (Q-80–Q-86) | **Pass** |
+| 13 | Every Q-ID cited exists in open-questions.md or is a new Phase 06 question (Q-80–Q-87) | **Pass** |
 | 14 | Every AC-ID cited exists in acceptance-criteria.md | **Pass** |
 | 15 | Every BR-, C- and ADR- reference exists | **Pass** |
 | 16 | Every risk, sprint and story reference in the sprint plan and risk register exists | **Pass** |
@@ -49,13 +49,14 @@
 ## 3. Backlog readiness
 | Status | Must | Should | Could | Total |
 |---|---|---|---|---|
-| Ready | 15 | 8 | 1 | 24 |
+| Done | 1 | 0 | 0 | 1 |
+| Ready | 14 | 8 | 1 | 23 |
 | Needs Clarification | 19 | 7 | 7 | 33 |
 | Blocked | 7 | 0 | 1 | 8 |
 
-45 stories are in the MVP scope (41 MVP, 4 pulled in): 18 Ready, 20 Needs Clarification, 7 Blocked. Of all 65 stories, **21 are startable** (not Blocked, with no Blocked ancestor), and 44 are Blocked or wait on a Blocked story. **28 of the 45 MVP stories wait on Q-70**, directly or through US-012 and US-015.
+45 stories are in the MVP scope (41 MVP, 4 pulled in): 1 Done, 17 Ready, 20 Needs Clarification, 7 Blocked. Of all 65 stories, **21 are startable** (not Blocked, with no Blocked ancestor), and 44 are Blocked or wait on a Blocked story. **28 of the 45 MVP stories wait on Q-70**, directly or through US-012 and US-015.
 
-**Ready and startable now (Sprint 0):** US-046 French price, date and countdown formatting; US-057 Local Docker environment; US-059 API foundation; US-060 Transport security and caching headers; US-061 MySQL behaviour spike.
+**Ready and startable now (Sprint 0):** US-046 French price, date and countdown formatting; US-057 Local Docker environment; US-060 Transport security and caching headers; US-061 MySQL behaviour spike.
 
 US-058 CI also belongs to Sprint 0, but it needs Q-82 (Git host and CI platform).
 

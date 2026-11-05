@@ -15,6 +15,7 @@ This is the prioritised backlog: one row per story, ordered by sprint, then MoSC
 ## 2. Status definitions
 | Status | Meaning |
 |---|---|
+| **Done** | Built and accepted by the PO against the [Definition of Done](07-definition-of-done.md) (Phase 08). It counts as Ready for every readiness rule |
 | **Ready** | Its own scope needs no decision: every requirement it cites is CONFIRMED, and it has no open question. It **starts once its dependencies are done**. If a dependency is Blocked, the story isn't startable yet; the "Startable" and "Waits on" columns show this |
 | **Needs Clarification** | Can be built against the Phase 05 seam (setting, switch or placeholder), but at least one open question must be answered before acceptance. Every HYPOTHESIS story is here or Blocked |
 | **Blocked** | Can't be built or can't be accepted at all until a decision is made: an UNKNOWN requirement, an undesigned behaviour, or a schema that can't be frozen |
@@ -26,7 +27,8 @@ This is the prioritised backlog: one row per story, ordered by sprint, then MoSC
 | MoSCoW Must | 41 |
 | MoSCoW Should | 15 |
 | MoSCoW Could | 9 |
-| Status Ready | 24 |
+| Status Done | 1 |
+| Status Ready | 23 |
 | Status Needs Clarification | 33 |
 | Status Blocked | 8 |
 | Class MVP | 41 |
@@ -42,7 +44,7 @@ This is the prioritised backlog: one row per story, ordered by sprint, then MoSC
 | 1 | US-046 | French price, date and countdown formatting | E11 | Must | Ready | yes | MVP | S0 | US-059 | — | NFR-I18N-03 | — |
 | 2 | US-057 | Local Docker environment | E14 | Must | Ready | yes | MVP | S0 | — | — | NFR-TECH-01 | — |
 | 3 | US-058 | Continuous integration | E14 | Must | Needs Clarification | yes | MVP | S0 | US-057 | — | NFR-TECH-01 | Q-82 |
-| 4 | US-059 | API foundation | E14 | Must | Ready | yes | MVP | S0 | US-057 | — | NFR-OBS-01, NFR-TECH-01 | — |
+| 4 | US-059 | API foundation | E14 | Must | Done | yes | MVP | S0 | US-057 | — | NFR-OBS-01, NFR-TECH-01 | — |
 | 5 | US-060 | Transport security and caching headers | E14 | Must | Ready | yes | MVP | S0 | US-057 | — | NFR-SEC-03, NFR-SEC-04, NFR-CACHE-01 | — |
 | 6 | US-061 | MySQL behaviour spike | E14 | Must | Ready | yes | MVP | S0 | US-057 | — | NFR-CON-01, NFR-TECH-01 | — |
 | 7 | US-001 | Register as an adult member | E01 | Must | Needs Clarification | yes | MVP | S1 | US-059, US-060 | — | FR-ACC-08 | Q-40, Q-41 |

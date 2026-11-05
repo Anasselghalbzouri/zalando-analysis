@@ -1473,7 +1473,7 @@ These stories refine the 27 Phase 04 stories ([user-stories.md](../requirements/
 > so that every endpoint is built the same way.
 
 - **Priority:** Must
-- **Status:** Ready
+- **Status:** Done
 - **MVP class:** MVP · **Sprint:** S0
 - **Dependencies:** US-057
 - **Waits on (Blocked ancestors):** — · **Startable once its dependencies are done:** yes

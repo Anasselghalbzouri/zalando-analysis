@@ -631,7 +631,7 @@ No tasks: the behaviour is not designed and must not be invented (see the story 
   - T-058-I2: Re-script the Phase 05 design-validation checks, whose original scripts weren't kept
 
 ### US-059
-**API foundation** · Ready · S0 · API: `GET /api/v1/storefront/settings`
+**API foundation** · Done · S0 · API: `GET /api/v1/storefront/settings`
 
 - **Backend:**
   - T-059-B1: `/api/v1` route groups by auth code; exception renderer covering the error-format catalogue; request-ID and server-time middleware; `config/storefront.php` and `StorefrontSettings` with the production boot check

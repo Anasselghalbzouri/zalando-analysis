@@ -1406,7 +1406,7 @@ role: developer
 want: one versioned API base with a uniform error format, request IDs, server time and fail-closed settings
 so: every endpoint is built the same way
 pri: Must
-status: Ready
+status: Done
 deps: US-057
 reqs: NFR-OBS-01, NFR-TECH-01
 p04: new

@@ -112,6 +112,7 @@ This is the prioritised backlog: one row per story, ordered by sprint, then MoSC
 ## 2. Status definitions
 | Status | Meaning |
 |---|---|
+| **Done** | Built and accepted by the PO against the [Definition of Done](07-definition-of-done.md) (Phase 08). It counts as Ready for every readiness rule |
 | **Ready** | Its own scope needs no decision: every requirement it cites is CONFIRMED, and it has no open question. It **starts once its dependencies are done**. If a dependency is Blocked, the story isn't startable yet; the "Startable" and "Waits on" columns show this |
 | **Needs Clarification** | Can be built against the Phase 05 seam (setting, switch or placeholder), but at least one open question must be answered before acceptance. Every HYPOTHESIS story is here or Blocked |
 | **Blocked** | Can't be built or can't be accepted at all until a decision is made: an UNKNOWN requirement, an undesigned behaviour, or a schema that can't be frozen |

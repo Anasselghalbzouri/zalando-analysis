@@ -102,11 +102,11 @@ bad = []
 for s in stories.values():
     classes = {REQ[r]['cls'] for r in s['reqs'] if r in REQ}
     weak = sorted(classes & {'HYPOTHESIS', 'UNKNOWN'})
-    if s['status'] == 'Ready' and weak: bad.append(f"{s['id']}: Ready but cites {weak}")
+    if s['status'] in ('Ready', 'Done') and weak: bad.append(f"{s['id']}: {s['status']} but cites {weak}")
     if 'UNKNOWN' in classes and s['status'] != 'Blocked': bad.append(f"{s['id']}: UNKNOWN requirement but status {s['status']}")
     if 'HYPOTHESIS' in classes and s['cls'] != 'Blocked': bad.append(f"{s['id']}: HYPOTHESIS requirement but class {s['cls']}")
-    if s['status'] == 'Ready' and s['qs']: bad.append(f"{s['id']}: Ready with open questions {s['qs']}")
-    if s['status'] != 'Ready' and not s['qs']: bad.append(f"{s['id']}: {s['status']} without a question ID")
+    if s['status'] in ('Ready', 'Done') and s['qs']: bad.append(f"{s['id']}: {s['status']} with open questions {s['qs']}")
+    if s['status'] not in ('Ready', 'Done') and not s['qs']: bad.append(f"{s['id']}: {s['status']} without a question ID")
 check('No UNKNOWN or HYPOTHESIS requirement is treated as confirmed (status and class rules)', bad)
 bad = []
 for s in stories.values():
@@ -128,7 +128,7 @@ check('Every table reference exists in schema.md (domain or framework tables)',
 check('No story touches checkout, payment or order endpoints or tables (M21 stays excluded)',
       [f"{s['id']}: {x}" for s in stories.values() for x in s['api'] + s['tables'] if re.search(r'checkout|payment|order', x)])
 alltext = ' '.join(story_text(s) for s in stories.values()) + ' '.join(' '.join(d.values()) for d in list(sprints.values()) + list(risks.values()) + list(questions.values()))
-check('Every Q-ID cited exists in open-questions.md or is a new Phase 06 question (Q-80–Q-86)',
+check('Every Q-ID cited exists in open-questions.md or is a new Phase 06 question (Q-80–Q-87)',
       sorted({q for q in re.findall(r'\bQ-\d\d\b', alltext) if q not in ALL_Q} | {q for s in stories.values() for q in s['qs'] if q not in ALL_Q}))
 check('Every AC-ID cited exists in acceptance-criteria.md', sorted({a for a in re.findall(r'AC-[A-Z]+-[A-Z0-9]+-\d\d-\d', alltext) if a not in acs}))
 check('Every BR-, C- and ADR- reference exists', sorted({x for x in re.findall(r'\bBR-\d\d-\d\d\b', alltext) if x not in brs}
@@ -194,7 +194,7 @@ def req_mvp(r, d):
     if d['cls'] == 'HYPOTHESIS': return 'Blocked by unresolved decision', f"HYPOTHESIS: built only behind a switch or as its own story, pending PO validation ({', '.join(qs)})", ids
     if d['cls'] == 'UNKNOWN': return 'MVP, blocked by unresolved decision', f"Must placeholder for an UNKNOWN requirement; the value or target must be decided first ({', '.join(qs)})", ids
     if d['pri'] == 'Must':
-        gated = [s for s in sts if s['status'] != 'Ready']
+        gated = [s for s in sts if s['status'] not in ('Ready', 'Done')]
         why = 'CONFIRMED Must: part of the core journey J1, brand search J4 or a legal, security or localisation baseline'
         if gated: why += f"; acceptance gated by {', '.join(sorted({q for s in gated for q in s['qs']}))}"
         return 'MVP', why, ids
@@ -234,7 +234,7 @@ rows = [f"| {i} | {s['id']} | {s['title']} | {s['epic']} | {s['pri']} | {s['stat
 mos = collections.Counter(s['pri'] for s in stories.values()); st = collections.Counter(s['status'] for s in stories.values()); cl = collections.Counter(s['cls'] for s in stories.values())
 summary = ('| Measure | Count |\n|---|---|\n' + f"| Stories | {len(stories)} |\n"
            + ''.join(f"| MoSCoW {k} | {mos[k]} |\n" for k in ('Must', 'Should', 'Could'))
-           + ''.join(f"| Status {k} | {st[k]} |\n" for k in ('Ready', 'Needs Clarification', 'Blocked'))
+           + ''.join(f"| Status {k} | {st[k]} |\n" for k in ('Done', 'Ready', 'Needs Clarification', 'Blocked'))
            + ''.join(f"| Class {k} | {cl[k]} |\n" for k in ('MVP', 'MVP (pulled in)', 'Post-MVP', 'Blocked')))
 write('03-product-backlog.md', tpl('03').replace('{{SUMMARY}}', summary) + '\n| Rank | ID | Title | Epic | MoSCoW | Status | Startable | MVP class | Sprint | Dependencies | Waits on (Blocked ancestors) | Source requirements | Open questions |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|\n' + '\n'.join(rows))
 
@@ -321,9 +321,9 @@ write('09-open-questions.md', tpl('09') + '\n| ID | Question | Why it matters | 
 # ---------- 10 summary ----------
 vt = '| # | Check | Result |\n|---|---|---|\n' + '\n'.join(f"| {i} | {n} | **{r}**{': ' + '; '.join(p[:8]) if p else ''} |" for i, (n, r, p) in enumerate(checks, 1))
 by_status = '| Status | Must | Should | Could | Total |\n|---|---|---|---|---|\n' + '\n'.join(
-    f"| {k} | " + ' | '.join(str(sum(1 for s in stories.values() if s['status'] == k and s['pri'] == p)) for p in ('Must', 'Should', 'Could')) + f" | {st[k]} |" for k in ('Ready', 'Needs Clarification', 'Blocked'))
+    f"| {k} | " + ' | '.join(str(sum(1 for s in stories.values() if s['status'] == k and s['pri'] == p)) for p in ('Must', 'Should', 'Could')) + f" | {st[k]} |" for k in ('Done', 'Ready', 'Needs Clarification', 'Blocked'))
 mvp_sts = [s for s in stories.values() if s['cls'].startswith('MVP')]
-mvp_line = f"{len(mvp_sts)} stories are in the MVP scope ({cl['MVP']} MVP, {cl['MVP (pulled in)']} pulled in): {sum(1 for s in mvp_sts if s['status'] == 'Ready')} Ready, {sum(1 for s in mvp_sts if s['status'] == 'Needs Clarification')} Needs Clarification, {sum(1 for s in mvp_sts if s['status'] == 'Blocked')} Blocked."
+mvp_line = f"{len(mvp_sts)} stories are in the MVP scope ({cl['MVP']} MVP, {cl['MVP (pulled in)']} pulled in): {sum(1 for s in mvp_sts if s['status'] == 'Done')} Done, {sum(1 for s in mvp_sts if s['status'] == 'Ready')} Ready, {sum(1 for s in mvp_sts if s['status'] == 'Needs Clarification')} Needs Clarification, {sum(1 for s in mvp_sts if s['status'] == 'Blocked')} Blocked."
 startable = [s for s in stories.values() if s['startable']]
 q70 = [s for s in mvp_sts if s['id'] in ('US-012', 'US-015') or set(s['waits']) & {'US-012', 'US-015'}]
 mvp_line += (f" Of all {len(stories)} stories, **{len(startable)} are startable** (not Blocked, with no Blocked ancestor), and {len(stories) - len(startable)} are Blocked or wait on a Blocked story."
